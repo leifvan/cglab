@@ -41,7 +41,7 @@ hist /= hist.sum()
 plot_x = np.linspace(-np.pi, np.pi, len(hist))
 
 y = wrapped_cauchy_kernel_density(theta=plot_x[:,None],
-                                  locations=np.ravel(angles[mask])[:, None],
+                                  samples=np.ravel(angles[mask])[:, None],
                                   weights=magnitudes[mask],
                                   rho=0.8)
 
