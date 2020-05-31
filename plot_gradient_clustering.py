@@ -72,14 +72,14 @@ labels = np.linspace(0, 1, len(main_gradient_angles), endpoint=False)
 hsv_cmap = plt_cm.get_cmap('hsv')
 
 # for each angle, find corresponding pixels and colorize them
-for angle, (low, high), label in zip(main_gradient_angles, main_gradient_intervals, labels):
+for angle, (low, high) in zip(main_gradient_angles, main_gradient_intervals):
     if low < high:
         label_mask = (mask) & (low <= angles) & (angles < high)
     else:
         label_mask = (mask) & ((low - 2 * np.pi) <= angles) & (angles < high)
         label_mask = label_mask | (mask) & (low <= angles) & (angles < (high + 2 * np.pi))
 
-    per_pixel_assignments[label_mask] = hsv_cmap(1-label)[:3]#hsv_cmap((angle + np.pi)/2/np.pi)[:3]
+    per_pixel_assignments[label_mask] = hsv_cmap((angle + np.pi)/2/np.pi)[:3]
 
 #per_pixel_assignments *= magnitudes[..., None] / magnitudes.max()
 
