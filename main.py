@@ -95,7 +95,7 @@ def calculate_point_displacements(points, assignments, distances):
     for point, displacement in zip(points, displacements):
         for angle, feature_mask, feature_distance in zip(centroids, assignments, distances):
             feature_locations = np.argwhere(feature_mask)
-            feature_dist_to_corner = np.linalg.norm(feature_locations - point[None], axis=1)**(-1)
+            feature_dist_to_corner = np.linalg.norm(feature_locations/200 - point[None]/200, axis=1)**(-2)
             # feature_dist_to_corner = scipy.interpolate.griddata(points=points,
             #                                                     values=np.prod(points == point, axis=1),
             #                                                     xi=feature_locations)
@@ -103,7 +103,7 @@ def calculate_point_displacements(points, assignments, distances):
             feature_dt_values = feature_distance[feature_locations[:, 0], feature_locations[:, 1]]
             magnitude = np.sum(feature_dt_values * feature_dist_to_corner) / len(feature_locations)
 
-            direction = np.array([np.cos(angle), np.sin(angle)])
+            direction = np.array([np.cos(angle), -np.sin(angle)])
             displacement += direction * magnitude
 
     return displacements
@@ -115,7 +115,7 @@ def calculate_point_displacements(points, assignments, distances):
 def apply_point_displacements(image, points, displacements):
     yy, xx = np.mgrid[:patch_h, :patch_w]
     grid_points = np.stack([yy, xx], axis=2)
-    warp_field = -5*scipy.interpolate.griddata(points, displacements, grid_points)
+    warp_field = 0.1*scipy.interpolate.griddata(points, displacements, grid_points)
 
     warped_image = skimage.transform.warp(image, np.array([yy + warp_field[...,0], xx + warp_field[...,1]]))
     return warped_image
