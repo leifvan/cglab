@@ -95,15 +95,15 @@ def calculate_point_displacements(points, assignments, distances):
     for point, displacement in zip(points, displacements):
         for angle, feature_mask, feature_distance in zip(centroids, assignments, distances):
             feature_locations = np.argwhere(feature_mask)
-            # feature_dist_to_corner = np.linalg.norm(feature_locations - corner_point[None], axis=1)
-            feature_dist_to_corner = scipy.interpolate.griddata(points=points,
-                                                                values=np.prod(points == point, axis=1),
-                                                                xi=feature_locations)
+            feature_dist_to_corner = np.linalg.norm(feature_locations - point[None], axis=1)**(-1)
+            # feature_dist_to_corner = scipy.interpolate.griddata(points=points,
+            #                                                     values=np.prod(points == point, axis=1),
+            #                                                     xi=feature_locations)
 
             feature_dt_values = feature_distance[feature_locations[:, 0], feature_locations[:, 1]]
             magnitude = np.sum(feature_dt_values * feature_dist_to_corner) / len(feature_locations)
 
-            direction = np.array([np.sin(angle), np.cos(angle)])
+            direction = np.array([np.cos(angle), np.sin(angle)])
             displacement += direction * magnitude
 
     return displacements
@@ -115,19 +115,25 @@ def calculate_point_displacements(points, assignments, distances):
 def apply_point_displacements(image, points, displacements):
     yy, xx = np.mgrid[:patch_h, :patch_w]
     grid_points = np.stack([yy, xx], axis=2)
-    warp_field = -40*scipy.interpolate.griddata(points, displacements, grid_points)
+    warp_field = -5*scipy.interpolate.griddata(points, displacements, grid_points)
 
     warped_image = skimage.transform.warp(image, np.array([yy + warp_field[...,0], xx + warp_field[...,1]]))
     return warped_image
 
 
 corner_points = np.array([[0, 0], [0, patch_w], [patch_h, 0], [patch_h, patch_w]])
-displacements = calculate_point_displacements(points=corner_points,
-                                              assignments=feature_patch_assignments,
-                                              distances=feature_window_distances)
+warped_feature_patch = feature_patch.copy()
+warped_feature_patch_assignments = feature_patch_assignments.copy()
 
+for _ in range(50):
+    warped_feature_patch_assignments = get_binary_pixel_assignments(warped_feature_patch, centroids, intervals)
+    displacements = calculate_point_displacements(points=corner_points,
+                                                  assignments=warped_feature_patch_assignments,
+                                                  distances=feature_window_distances)
 
-warped_feature_patch = apply_point_displacements(feature_patch, corner_points, displacements)
+    print(get_energy(warped_feature_patch_assignments, feature_window_distances))
 
-plt.imshow(warped_feature_patch - feature_window, cmap='coolwarm')
-plt.show()
+    warped_feature_patch = apply_point_displacements(warped_feature_patch, corner_points, displacements)
+
+    plt.imshow(warped_feature_patch - feature_window, cmap='coolwarm')
+    plt.show()
