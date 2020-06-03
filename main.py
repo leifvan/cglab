@@ -42,6 +42,7 @@ def get_binary_pixel_assignments(image, centroids, intervals):
 
 pixel_assignments = get_binary_pixel_assignments(feature_map, centroids, intervals)
 
+
 def get_distance_transforms_from_binary_assignments(assignments):
     # calculate distance transform for the maps
     distance_transforms = np.zeros_like(assignments, dtype=np.float32)
@@ -86,16 +87,17 @@ for f_mask, f_dist in zip(feature_patch_assignments, feature_window_distances):
 
 print("=>", get_energy(feature_patch_assignments, feature_window_distances))
 
+
 # determine transformation
 
 
-def calculate_point_displacements(points, assignments, distances):
+def calculate_point_displacements(points, angles, assignments, distances):
     displacements = np.zeros_like(points, dtype=np.float32)
 
     for point, displacement in zip(points, displacements):
-        for angle, feature_mask, feature_distance in zip(centroids, assignments, distances):
+        for angle, feature_mask, feature_distance in zip(angles, assignments, distances):
             feature_locations = np.argwhere(feature_mask)
-            feature_dist_to_corner = np.linalg.norm(feature_locations/200 - point[None]/200, axis=1)**(-2)
+            feature_dist_to_corner = np.linalg.norm(feature_locations / 200 - point[None] / 200, axis=1) ** (-2)
             # feature_dist_to_corner = scipy.interpolate.griddata(points=points,
             #                                                     values=np.prod(points == point, axis=1),
             #                                                     xi=feature_locations)
@@ -115,25 +117,70 @@ def calculate_point_displacements(points, assignments, distances):
 def apply_point_displacements(image, points, displacements):
     yy, xx = np.mgrid[:patch_h, :patch_w]
     grid_points = np.stack([yy, xx], axis=2)
-    warp_field = 0.1*scipy.interpolate.griddata(points, displacements, grid_points)
+    warp_field = 0.1 * scipy.interpolate.griddata(points, displacements, grid_points)
 
-    warped_image = skimage.transform.warp(image, np.array([yy + warp_field[...,0], xx + warp_field[...,1]]))
+    warped_image = skimage.transform.warp(image, np.array([yy + warp_field[..., 0], xx + warp_field[..., 1]]))
     return warped_image
 
 
-corner_points = np.array([[0, 0], [0, patch_w], [patch_h, 0], [patch_h, patch_w]])
+def calculate_dense_displacements(angles, assignments, distances):
+    yy, xx = np.mgrid[:patch_h, :patch_w]
+    grid_points = np.stack([yy, xx], axis=2)
+    warp_fields = np.zeros((len(angles), *assignments.shape[1:], 2), dtype=np.float32)
+
+    for angle, feature_mask, distance_map, warp_field in zip(angles, assignments, distances, warp_fields):
+        feature_locations = np.argwhere(feature_mask)
+        feature_distances = distance_map[feature_locations[:, 0], feature_locations[:, 1]]
+
+        # (-sc. s-c), cs, -cs, c-s, -c-s
+        unit_direction = np.array([np.cos(angle), -np.sin(angle)])
+
+        #feature_distances = (distance_map + 1e-7)**(-1)
+
+        # warp_field[:] = unit_direction * scipy.interpolate.griddata(points=feature_locations,
+        #                                                             values=feature_distances,
+        #                                                             xi=grid_points,
+        #                                                             method='nearest')[..., None]
+        interpolator = scipy.interpolate.SmoothBivariateSpline(x=feature_locations[:,0],
+                                                               y=feature_locations[:,1],
+                                                               z=feature_distances,
+                                                               bbox=(0, patch_h, 0, patch_w),
+                                                               kx=1,
+                                                               ky=1)
+        values = interpolator(np.arange(0, patch_h), np.arange(0, patch_w))
+        vectors = unit_direction * values[..., None]
+        warp_field[:] = np.reshape(vectors, warp_field.shape)
+
+        # TODO this does not work because the direction does not depend on the angles but on the location of the closest feature
+
+        # _, axs = plt.subplots(1, 2)
+        # min_val, max_val = warp_field.min(), warp_field.max()
+        # axs[0].imshow(warp_field[..., 0], cmap='coolwarm', vmin=min_val, vmax=max_val)
+        # axs[1].imshow(warp_field[..., 1], cmap='coolwarm', vmin=min_val, vmax=max_val)
+        # plt.suptitle(unit_direction)
+        # plt.show()
+
+    return warp_fields
+
+
 warped_feature_patch = feature_patch.copy()
-warped_feature_patch_assignments = feature_patch_assignments.copy()
+#warped_feature_patch_assignments = feature_patch_assignments.copy()
 
-for _ in range(50):
+for i in range(10):
     warped_feature_patch_assignments = get_binary_pixel_assignments(warped_feature_patch, centroids, intervals)
-    displacements = calculate_point_displacements(points=corner_points,
-                                                  assignments=warped_feature_patch_assignments,
-                                                  distances=feature_window_distances)
+    warp_fields = calculate_dense_displacements(centroids, warped_feature_patch_assignments,
+                                                feature_window_distances)
+    mean_warp_field = 0.1 * warp_fields.mean(axis=0)
 
-    print(get_energy(warped_feature_patch_assignments, feature_window_distances))
+    _, axs = plt.subplots(1, 2)
+    min_val, max_val = mean_warp_field.min(), mean_warp_field.max()
+    axs[0].imshow(mean_warp_field[..., 0], cmap='coolwarm', vmin=min_val, vmax=max_val)
+    axs[1].imshow(mean_warp_field[..., 1], cmap='coolwarm', vmin=min_val, vmax=max_val)
+    plt.show()
 
-    warped_feature_patch = apply_point_displacements(warped_feature_patch, corner_points, displacements)
+    yy, xx = np.mgrid[:200, :200]
+    absolute_warp_field = np.array([yy + mean_warp_field[...,0], xx + mean_warp_field[..., 1]])
+    warped_feature_patch = skimage.transform.warp(warped_feature_patch, absolute_warp_field)
 
     plt.imshow(warped_feature_patch - feature_window, cmap='coolwarm')
     plt.show()
