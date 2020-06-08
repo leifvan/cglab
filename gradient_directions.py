@@ -3,7 +3,8 @@ import numpy as np
 from random import sample
 from scipy.signal import find_peaks
 from scipy.spatial.distance import cdist
-
+import matplotlib.pyplot as plt
+import matplotlib.cm as plt_cm
 
 # https://arxiv.org/pdf/1601.05053.pdf
 def wrapped_cauchy_kernel_density(theta, samples, weights, rho):
@@ -113,3 +114,36 @@ def get_main_gradient_angles_and_intervals(feature_map):
     centroids, intervals = cluster_density_by_extrema(sample_points, scores)
 
     return centroids, intervals
+
+
+# --------------
+# PLOT FUNCTIONS
+# --------------
+
+def plot_polar_gradients(angles, magnitudes, ax=None):
+    ax = ax or plt.gca()
+    hsv = plt_cm.get_cmap('hsv')
+
+    vis = np.zeros((*angles.shape, 3))
+    vis[:] = hsv((angles + np.pi)/2/np.pi)[..., :3]
+    vis *= (magnitudes[..., None] / magnitudes.max())
+
+    ax.imshow(vis)
+
+
+def plot_binary_assignments(assignments, centroids, ax=None):
+    ax = ax or plt.gca()
+    all_assignments = np.sum(assignments * np.arange(1, len(assignments)+1)[..., None, None], axis=0)
+    angle_array = np.take(centroids, all_assignments-1)
+
+    plot_polar_gradients(angle_array, all_assignments != 0, ax)
+
+
+def plot_distance_transforms(distance_transforms, axes):
+    for dt, ax in zip(distance_transforms, axes):
+        ax.imshow(dt)
+
+
+def plot_feature_directions(feature_directions, axes):
+    for fd, ax in zip(feature_directions, axes):
+        plot_polar_gradients(fd, np.ones_like(fd), ax)
