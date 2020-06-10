@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from scipy.ndimage.morphology import distance_transform_edt
 import skimage.transform
 import scipy.interpolate
-from scipy.ndimage.filters import gaussian_filter
 from gradient_directions import get_main_gradient_angles_and_intervals, get_gradients_in_polar_coords, \
     plot_polar_gradients, plot_binary_assignments, plot_distance_transforms, plot_feature_directions
 
@@ -21,7 +20,7 @@ feature_map = imageio.imread(args.feature_map_path).astype(np.float32)
 if len(feature_map.shape) == 3:
     feature_map = np.mean(feature_map, axis=2)
 
-feature_map = skimage.transform.downscale_local_mean(feature_map, (2,2))
+feature_map = skimage.transform.downscale_local_mean(feature_map, (2, 2))
 feature_map /= feature_map.max()
 feature_map[feature_map > 0.5] = 1
 feature_map[feature_map < 0.5] = 0
@@ -92,17 +91,17 @@ plt.show()
 # # take a 200x200 patch
 # patch_y, patch_x = 100, 400
 # patch_h, patch_w = 200, 200
-patch_y, patch_x = 30*4, 64*4
-#patch_y, patch_x = 20, 10
-patch_h, patch_w = 36*4, 36*4
+patch_y, patch_x = 30 * 2, 64 * 2
+# patch_y, patch_x = 20, 10
+patch_h, patch_w = 36 * 2, 36 * 2
 feature_patch = feature_map[patch_y: patch_y + patch_h, patch_x: patch_x + patch_w]
 feature_patch_assignments = pixel_assignments[:, patch_y: patch_y + patch_h, patch_x: patch_x + patch_w]
 feature_patch_directions = feature_directions[:, patch_y: patch_y + patch_h, patch_x: patch_x + patch_w]
 
 # # and a window in the image
-#window_y, window_x = 0, 0
-window_y, window_x = 2*4, 5*4
-window_h, window_w = 36*4, 36*4
+# window_y, window_x = 0, 0
+window_y, window_x = 2 * 2, 5 * 2
+window_h, window_w = 36 * 2, 36 * 2
 feature_window = feature_map[window_y: window_y + window_h, window_x: window_x + window_w]
 feature_window_distances = distance_transforms[:, window_y: window_y + window_h, window_x: window_x + window_w]
 feature_window_directions = feature_directions[:, window_y: window_y + window_h, window_x: window_x + window_w]
@@ -138,10 +137,6 @@ def calculate_point_displacements(points, angles, assignments, distances):
         for angle, feature_mask, feature_distance in zip(angles, assignments, distances):
             feature_locations = np.argwhere(feature_mask)
             feature_dist_to_corner = np.linalg.norm(feature_locations / 200 - point[None] / 200, axis=1) ** (-2)
-            # feature_dist_to_corner = scipy.interpolate.griddata(points=points,
-            #                                                     values=np.prod(points == point, axis=1),
-            #                                                     xi=feature_locations)
-
             feature_dt_values = feature_distance[feature_locations[:, 0], feature_locations[:, 1]]
             magnitude = np.sum(feature_dt_values * feature_dist_to_corner) / len(feature_locations)
 
@@ -170,7 +165,7 @@ def calculate_dense_displacements(angles, assignments, distances, directions, sm
     feature_gradient_magnitudes = np.zeros(distances.shape[1:])
 
     for angle, feature_mask, vec_magnitudes, vec_angles in zip(angles, assignments,
-                                                                         distances, directions):
+                                                               distances, directions):
         feature_locations = np.argwhere(feature_mask)
         feature_gradient_angles[feature_locations[:, 0],
                                 feature_locations[:, 1]] = vec_angles[feature_locations[:, 0],
@@ -179,17 +174,8 @@ def calculate_dense_displacements(angles, assignments, distances, directions, sm
                                     feature_locations[:, 1]] = vec_magnitudes[feature_locations[:, 0],
                                                                               feature_locations[:, 1]]
 
-    # plot_polar_gradients(feature_gradient_angles, feature_gradient_magnitudes)
-    # plt.show()
-
     all_locations = np.argwhere(feature_gradient_angles)
     fy, fx = all_locations[:, 0], all_locations[:, 1]
-
-    # interpolation of angles does not work
-    # interpolator = scipy.interpolate.Rbf(fy, fx, feature_gradient[fy, fx], function='linear')
-    # interpolated_gradient = interpolator(yy, xx)
-    # plot_polar_gradients(interpolated_gradient, np.ones_like(interpolated_gradient))
-    # plt.show()
 
     feature_gradient_cartesian = np.array([np.sin(feature_gradient_angles), np.cos(feature_gradient_angles)])
     feature_gradient_cartesian *= feature_gradient_magnitudes
@@ -200,15 +186,12 @@ def calculate_dense_displacements(angles, assignments, distances, directions, sm
     interpolated_y = interpolator_y(yy, xx)
     interpolated_x = interpolator_x(yy, xx)
 
-    # angles_again = np.arctan2(interpolated_y, interpolated_x)
-    # plot_polar_gradients(angles_again, np.ones_like(angles_again))
-    # plt.show()
-
     return np.array([interpolated_y, interpolated_x])
 
 
 plot_feature_directions(feature_window_directions, plt.subplots(2, 2)[1].ravel())
 plt.show()
+
 
 def plot_diff(warped, target, i):
     _, axs = plt.subplots(1, 3, figsize=(12, 4))
@@ -222,6 +205,7 @@ def plot_diff(warped, target, i):
     plt.tight_layout()
     plt.savefig(f"data/plot/plot{i}.png")
     plt.show()
+
 
 warped_feature_patch = feature_patch.copy()
 displacement = np.mgrid[:patch_h, :patch_w].astype(np.float64)
@@ -238,53 +222,10 @@ for i in range(20):
     warped_feature_patch[warped_feature_patch > 0.5] = 1
     warped_feature_patch[warped_feature_patch < 0.5] = 0
 
-    plot_diff(warped_feature_patch, feature_window, i+1)
-
-    # _, axes = plt.subplots(2,2)
-    # axes[0,0].imshow(warped_feature_patch)
-    # axes[0,1].imshow(feature_window)
-    # axes[1,0].imshow(warped_feature_patch - feature_window, cmap='coolwarm')
-    # axes[1,1].imshow(feature_patch - feature_window, cmap='coolwarm')
-    # plt.show()
-
+    plot_diff(warped_feature_patch, feature_window, i + 1)
 
 with imageio.get_writer('data/plot/plot.gif', mode='I', duration=0.5) as writer:
-    for i in range(20+1):
+    for i in range(20 + 1):
         filename = f"data/plot/plot{i}.png"
         image = imageio.imread(filename)
         writer.append_data(image)
-
-# warped_feature_patch = feature_patch.copy()
-# warped_feature_patch_assignments = feature_patch_assignments.copy()
-
-# for i in range(2):
-#     warped_feature_patch_assignments = get_binary_pixel_assignments(warped_feature_patch, centroids, intervals)
-#     warped_feature_patch_directions = get_closest_feature_directions_from_binary_assignments(
-#         warped_feature_patch_assignments)
-#     warp_fields = calculate_dense_displacements(centroids, warped_feature_patch_assignments,
-#                                                 feature_window_distances, warped_feature_patch_directions)
-#     mean_warp_field = 5. * warp_fields.mean(axis=0)
-#     # mean_warp_field[..., 0] = gaussian_filter(mean_warp_field[..., 0], sigma=20.)
-#     # mean_warp_field[..., 1] = gaussian_filter(mean_warp_field[..., 1], sigma=20.)
-#
-#     # _, axs = plt.subplots(1, 2)
-#     # min_val, max_val = mean_warp_field.min(), mean_warp_field.max()
-#     # axs[0].imshow(mean_warp_field[..., 0], cmap='coolwarm', vmin=min_val, vmax=max_val)
-#     # axs[1].imshow(mean_warp_field[..., 1], cmap='coolwarm', vmin=min_val, vmax=max_val)
-#     # plt.show()
-#
-#     yy, xx = np.mgrid[:window_h, :window_w]
-#     absolute_warp_field = np.array([yy + mean_warp_field[..., 0], xx + mean_warp_field[..., 1]])
-#     warped_feature_patch = skimage.transform.warp(warped_feature_patch, absolute_warp_field,
-#                                                   order=2)
-#     # warped_feature_patch[warped_feature_patch > 0.5] = 1
-#
-#     # plt.imshow(warped_feature_patch - feature_window, cmap='coolwarm')
-#     # plt.show()
-#
-#     # hsv: red = left, green = up, cyan = right, magenta = down
-#     _, axs = plt.subplots(1, 2)
-#     warp_angles = np.arctan2(mean_warp_field[..., 0], mean_warp_field[..., 1])
-#     axs[0].imshow(warp_angles, cmap='hsv', vmin=-np.pi, vmax=np.pi)
-#     axs[1].imshow(warped_feature_patch - feature_window, cmap='coolwarm')
-#     plt.show()
