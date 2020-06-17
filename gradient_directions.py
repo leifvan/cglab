@@ -1,10 +1,11 @@
-from skimage.filters import farid_h, farid_v, gaussian
+from skimage.filters import farid_h, farid_v, gaussian, gabor
 import numpy as np
 from random import sample
 from scipy.signal import find_peaks
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import matplotlib.cm as plt_cm
+
 
 # https://arxiv.org/pdf/1601.05053.pdf
 def wrapped_cauchy_kernel_density(theta, samples, weights, rho):
@@ -116,6 +117,23 @@ def get_main_gradient_angles_and_intervals(feature_map):
     return centroids, intervals
 
 
+def apply_gabor_filters(image, n_filters, **kwargs):
+    """
+    Applies ``n_filters`` many gabor filters with evenly spaced orientations to ``image``.
+
+    :param image: Image to apply the filters to.
+    :param n_filters: Number of filters to apply.
+    :param kwargs: Additional parameters passed to skimage.filters.gabor.
+    :return: An array of shape ``(n_filters, *image.shape)`` containing the (real) filter responses
+        of the applied gabor filters.
+    """
+    responses = np.zeros((n_filters, *image.shape))
+    thetas = np.linspace(0, np.pi, num=n_filters, endpoint=False)
+    for response, theta in zip(responses, thetas):
+        response[:] = gabor(image, theta=theta, **kwargs)[0]
+    return responses, thetas
+
+
 # --------------
 # PLOT FUNCTIONS
 # --------------
@@ -125,7 +143,7 @@ def plot_polar_gradients(angles, magnitudes, ax=None):
     hsv = plt_cm.get_cmap('hsv')
 
     vis = np.zeros((*angles.shape, 3))
-    vis[:] = hsv((angles + np.pi)/2/np.pi)[..., :3]
+    vis[:] = hsv((angles + np.pi) / 2 / np.pi)[..., :3]
     vis *= (magnitudes[..., None] / magnitudes.max())
 
     ax.imshow(vis)
@@ -133,8 +151,8 @@ def plot_polar_gradients(angles, magnitudes, ax=None):
 
 def plot_binary_assignments(assignments, centroids, ax=None):
     ax = ax or plt.gca()
-    all_assignments = np.sum(assignments * np.arange(1, len(assignments)+1)[..., None, None], axis=0)
-    angle_array = np.take(centroids, all_assignments-1)
+    all_assignments = np.sum(assignments * np.arange(1, len(assignments) + 1)[..., None, None], axis=0)
+    angle_array = np.take(centroids, all_assignments - 1)
 
     plot_polar_gradients(angle_array, all_assignments != 0, ax)
 
