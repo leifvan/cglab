@@ -1,5 +1,8 @@
 from matplotlib import pyplot as plt
-
+import random
+import string
+import imageio
+import os
 
 def plot_diff(warped, target, i):
     _, axs = plt.subplots(1, 3, figsize=(12, 4))
@@ -11,5 +14,24 @@ def plot_diff(warped, target, i):
         ax.axis('off')
 
     plt.tight_layout()
-    plt.savefig(f"data/plot/plot{i}.png")
-    plt.show()
+
+
+class GifExporter:
+    def __init__(self):
+        self.image_paths = []
+        os.makedirs("data/temp/", exist_ok=True)
+
+    def add_current_fig(self):
+        random_filename = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        path = f"data/temp/{random_filename}.png"
+        plt.savefig(path)
+        self.image_paths.append(path)
+
+    def save_gif(self, path, duration=None):
+        with imageio.get_writer(path, mode='I', duration=duration) as writer:
+            for path in self.image_paths:
+                image = imageio.imread(path)
+                writer.append_data(image)
+
+        for path in self.image_paths:
+            os.remove(path)

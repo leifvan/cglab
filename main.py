@@ -9,7 +9,7 @@ from distance_transform import get_binary_assignments_from_centroids, get_distan
     get_closest_feature_directions_from_binary_assignments
 from gradient_directions import get_main_gradient_angles_and_intervals, get_gradients_in_polar_coords, \
     plot_polar_gradients, plot_binary_assignments, plot_distance_transforms, plot_feature_directions
-from utils import plot_diff
+from utils import plot_diff, GifExporter
 
 parser = argparse.ArgumentParser()
 parser.add_argument('feature_map_path')
@@ -94,6 +94,8 @@ displacement = np.mgrid[:patch_h, :patch_w].astype(np.float64)
 
 plot_diff(warped_feature_patch, feature_window, 0)
 
+gif_exporter = GifExporter()
+
 for i in range(20):
     # feature_patch_responses, _ = apply_gabor_filters(warped_feature_patch, n_filters=4, frequency=0.5,
     #                                                  bandwidth=1.3)
@@ -108,9 +110,7 @@ for i in range(20):
     warped_feature_patch[warped_feature_patch > 0.5] = 1
     warped_feature_patch[warped_feature_patch < 0.5] = 0
     plot_diff(warped_feature_patch, feature_window, i + 1)
+    gif_exporter.add_current_fig()
+    plt.show()
 
-with imageio.get_writer('data/plot/plot.gif', mode='I', duration=0.5) as writer:
-    for i in range(20 + 1):
-        filename = f"data/plot/plot{i}.png"
-        image = imageio.imread(filename)
-        writer.append_data(image)
+gif_exporter.save_gif("data/plot/plot.gif")
