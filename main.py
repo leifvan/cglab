@@ -30,16 +30,22 @@ feature_map /= feature_map.max()
 feature_map[feature_map > 0.5] = 1
 feature_map[feature_map < 0.5] = 0
 
-patches_a, patches_b = find_promising_patch_pairs(feature_map, patch_size=80, stride=8)
-for pa, pb in zip(patches_a, patches_b):
-    (pay, pby), (pax, pbx) = np.unravel_index([pa, pb], shape=(feature_map.shape[0]-80,
-                                                               feature_map.shape[1]-80))
-    patch_a = feature_map[pay:pay+80, pax:pax+80]
-    patch_b = feature_map[pby:pby+80, pbx:pbx+80]
-    plt.imshow(patch_a-patch_b, cmap='coolwarm')
-    plt.show()
+# ------------------------
+# pick two fitting patches
+# ------------------------
 
-exit(0)
+patch_size = 40
+pairs = find_promising_patch_pairs(feature_map, patch_size=patch_size, stride=8, num_pairs=100)
+# for slice_a, slice_b, _ in pairs:
+#     patch_a = feature_map[slice_a]
+#     patch_b = feature_map[slice_b]
+#     plt.imshow(patch_a-patch_b, cmap='coolwarm')
+#     plt.show()
+
+patch_slice, window_slice, _ = pairs[0]
+
+feature_patch = feature_map[patch_slice]
+feature_window = feature_map[window_slice]
 
 # ---------------
 # get assignments
@@ -74,35 +80,28 @@ plt.show()
 plot_feature_directions(feature_directions, plt.subplots(2, 2)[1].ravel())
 plt.show()
 
-# # take a 200x200 patch
-# patch_y, patch_x = 100, 400
-# patch_h, patch_w = 200, 200
-MULT = 4
-patch_y, patch_x = 30 * MULT, 64 * MULT
-# patch_y, patch_x = 20, 10
-patch_h, patch_w = 36 * MULT, 36 * MULT
-feature_patch = feature_map[patch_y: patch_y + patch_h, patch_x: patch_x + patch_w]
-feature_patch_assignments = assignments[:, patch_y: patch_y + patch_h, patch_x: patch_x + patch_w]
-feature_patch_directions = feature_directions[:, patch_y: patch_y + patch_h, patch_x: patch_x + patch_w]
-
-# # and a window in the image
-# window_y, window_x = 0, 0
-window_y, window_x = 2 * MULT, 5 * MULT
-window_h, window_w = 36 * MULT, 36 * MULT
-feature_window = feature_map[window_y: window_y + window_h, window_x: window_x + window_w]
-feature_window_distances = distance_transforms[:, window_y: window_y + window_h, window_x: window_x + window_w]
-feature_window_directions = feature_directions[:, window_y: window_y + window_h, window_x: window_x + window_w]
 
 plt.imshow(feature_patch - feature_window, cmap='coolwarm')
 plt.show()
 
-# apply transformation to patch
+# ------------------------------------------
+# get additional information for the patches
+# ------------------------------------------
+
+feature_patch_assignments = assignments[:, patch_slice[0], patch_slice[1]]
+feature_patch_directions = feature_directions[:, patch_slice[0], patch_slice[1]]
+feature_window_distances = distance_transforms[:, window_slice[0], window_slice[1]]
+feature_window_directions = feature_directions[:, window_slice[0], window_slice[1]]
+
+# ---------------------
+# transform iteratively
+# ---------------------
 
 plot_feature_directions(feature_window_directions, plt.subplots(2, 2)[1].ravel())
 plt.show()
 
 warped_feature_patch = feature_patch.copy()
-displacement = np.mgrid[:patch_h, :patch_w].astype(np.float64)
+displacement = np.mgrid[:patch_size, :patch_size].astype(np.float64)
 
 plot_diff(warped_feature_patch, feature_window, 0)
 
@@ -115,7 +114,7 @@ for i in range(20):
     feature_patch_assignments = get_binary_assignments_from_centroids(warped_feature_patch, centroids, intervals)
 
     warp_field = calculate_dense_displacements(feature_patch_assignments, feature_window_distances,
-                                               feature_window_directions, smooth=1e5)
+                                               feature_window_directions, smooth=1e1)
 
     displacement += warp_field
     warped_feature_patch = skimage.transform.warp(feature_patch, displacement)
@@ -123,6 +122,6 @@ for i in range(20):
     warped_feature_patch[warped_feature_patch < 0.5] = 0
     plot_diff(warped_feature_patch, feature_window, i + 1)
     gif_exporter.add_current_fig()
-    plt.show()
+    plt.close()
 
-gif_exporter.save_gif("data/plot/plot.gif")
+gif_exporter.save_gif("data/plot/plot.gif", duration=0.2)

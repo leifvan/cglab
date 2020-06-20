@@ -39,18 +39,22 @@ class GifExporter:
 
 
 class NBestCollection:
-    def __init__(self, n, key):
+    def __init__(self, n, key, reverse=False):
         self.cur_min = math.inf
         #self.cur_max = -math.inf
         self.items = []
         self.n = n
         self.key = key
+        self.key_factor = -1 if reverse else 1
+
+    def _key(self, value):
+        return self.key_factor * self.key(value)
 
     def add(self, item):
         if len(self.items) < self.n:
             self.items.append(item)
-            self.items.sort(key=self.key)
-        elif self.key(item) > self.key(self.items[0]):
+            self.items.sort(key=self._key)
+        elif self._key(item) > self._key(self.items[0]):
             self.items.pop(0)
             self.items.append(item)
-            self.items.sort(key=self.key)
+            self.items.sort(key=self._key)
