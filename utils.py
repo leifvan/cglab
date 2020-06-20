@@ -5,6 +5,7 @@ import imageio
 import os
 import math
 
+
 def plot_diff(warped, target, i):
     _, axs = plt.subplots(1, 3, figsize=(12, 4))
     axs[0].imshow(warped, cmap='coolwarm', vmin=-1, vmax=1)
@@ -15,6 +16,14 @@ def plot_diff(warped, target, i):
         ax.axis('off')
 
     plt.tight_layout()
+
+
+def pad_slices(slices, padding, assert_shape=None):
+    new_slices = tuple(slice(s.start - padding, s.stop + padding, s.step) for s in slices)
+    if assert_shape:
+        assert all(0 <= s.start < shape and 0 <= s.stop < shape
+                   for s, shape in zip(new_slices, assert_shape))
+    return new_slices
 
 
 class GifExporter:
@@ -41,7 +50,7 @@ class GifExporter:
 class NBestCollection:
     def __init__(self, n, key, reverse=False):
         self.cur_min = math.inf
-        #self.cur_max = -math.inf
+        # self.cur_max = -math.inf
         self.items = []
         self.n = n
         self.key = key

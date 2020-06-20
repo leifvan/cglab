@@ -117,6 +117,14 @@ def get_main_gradient_angles_and_intervals(feature_map):
     return centroids, intervals
 
 
+def get_n_equidistant_angles_and_intervals(n_angles):
+    centroids = np.linspace(0, 2 * np.pi, endpoint=False, num=n_angles)
+    bounds_left = (centroids - centroids[1] / 2) % (2 * np.pi)
+    bounds_right = centroids + centroids[1] / 2
+    intervals = np.stack([bounds_left, bounds_right], axis=1)
+    return centroids, intervals
+
+
 def apply_gabor_filters(image, n_filters, **kwargs):
     """
     Applies ``n_filters`` many gabor filters with evenly spaced orientations to ``image``.
