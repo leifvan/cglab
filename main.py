@@ -124,7 +124,7 @@ plt.show()
 warped_feature_patch = feature_patch.copy()
 displacement = np.mgrid[:feature_patch.shape[0], :feature_patch.shape[1]].astype(np.float64)
 
-plot_diff(warped_feature_patch, feature_window, 0)
+plot_diff(warped_feature_patch, feature_window)
 
 gif_exporter = GifExporter()
 n_iter = 20
@@ -138,7 +138,7 @@ for i in tqdm(range(n_iter)):
     warped_feature_patch = skimage.transform.warp(feature_patch, displacement, mode='constant')
     warped_feature_patch[warped_feature_patch > 0.5] = 1
     warped_feature_patch[warped_feature_patch < 0.5] = 0
-    plot_diff(warped_feature_patch, feature_window, i + 1)
+    plot_diff(warped_feature_patch, feature_window)
     gif_exporter.add_current_fig()
     if i < n_iter-1:
         plt.close()
