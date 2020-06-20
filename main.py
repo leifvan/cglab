@@ -10,6 +10,7 @@ from distance_transform import get_binary_assignments_from_centroids, get_distan
 from gradient_directions import get_main_gradient_angles_and_intervals, get_gradients_in_polar_coords, \
     plot_polar_gradients, plot_binary_assignments, plot_distance_transforms, plot_feature_directions
 from utils import plot_diff, GifExporter
+from patches import find_promising_patch_pairs
 
 parser = argparse.ArgumentParser()
 parser.add_argument('feature_map_path')
@@ -24,10 +25,21 @@ feature_map = imageio.imread(args.feature_map_path).astype(np.float32)
 if len(feature_map.shape) == 3:
     feature_map = np.mean(feature_map, axis=2)
 
-feature_map = skimage.transform.downscale_local_mean(feature_map, (2, 2))
+feature_map = skimage.transform.downscale_local_mean(feature_map, (4, 4))
 feature_map /= feature_map.max()
 feature_map[feature_map > 0.5] = 1
 feature_map[feature_map < 0.5] = 0
+
+patches_a, patches_b = find_promising_patch_pairs(feature_map, patch_size=80, stride=8)
+for pa, pb in zip(patches_a, patches_b):
+    (pay, pby), (pax, pbx) = np.unravel_index([pa, pb], shape=(feature_map.shape[0]-80,
+                                                               feature_map.shape[1]-80))
+    patch_a = feature_map[pay:pay+80, pax:pax+80]
+    patch_b = feature_map[pby:pby+80, pbx:pbx+80]
+    plt.imshow(patch_a-patch_b, cmap='coolwarm')
+    plt.show()
+
+exit(0)
 
 # ---------------
 # get assignments

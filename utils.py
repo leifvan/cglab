@@ -3,6 +3,7 @@ import random
 import string
 import imageio
 import os
+import math
 
 def plot_diff(warped, target, i):
     _, axs = plt.subplots(1, 3, figsize=(12, 4))
@@ -35,3 +36,21 @@ class GifExporter:
 
         for path in self.image_paths:
             os.remove(path)
+
+
+class NBestCollection:
+    def __init__(self, n, key):
+        self.cur_min = math.inf
+        #self.cur_max = -math.inf
+        self.items = []
+        self.n = n
+        self.key = key
+
+    def add(self, item):
+        if len(self.items) < self.n:
+            self.items.append(item)
+            self.items.sort(key=self.key)
+        elif self.key(item) > self.key(self.items[0]):
+            self.items.pop(0)
+            self.items.append(item)
+            self.items.sort(key=self.key)
