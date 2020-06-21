@@ -1,5 +1,7 @@
 import numpy as np
 import scipy.interpolate
+import matplotlib.pyplot as plt
+from gradient_directions import plot_polar_gradients, plot_gradients_as_arrows
 
 
 def calculate_dense_displacements(assignments, distances, directions, smooth):
@@ -20,24 +22,16 @@ def calculate_dense_displacements(assignments, distances, directions, smooth):
     height, width = distances.shape[1:3]
     yy, xx = np.mgrid[:height, :width]
 
-    feature_gradient_angles = np.zeros(distances.shape[1:])
-    feature_gradient_magnitudes = np.zeros(distances.shape[1:])
+    feature_gradient_cartesian = np.zeros((2, *distances.shape[1:]))
 
+    # TODO we don't need this for loop any more
     for feature_mask, vec_magnitudes, vec_angles in zip(assignments, distances, directions):
-        feature_locations = np.argwhere(feature_mask)
-        feature_gradient_angles[feature_locations[:, 0],
-                                feature_locations[:, 1]] = vec_angles[feature_locations[:, 0],
-                                                                      feature_locations[:, 1]]
-        feature_gradient_magnitudes[feature_locations[:, 0],
-                                    feature_locations[:, 1]] = vec_magnitudes[feature_locations[:, 0],
-                                                                              feature_locations[:, 1]]
+        this_feature_cartesian = np.array([np.sin(vec_angles), np.cos(vec_angles)])
+        this_feature_cartesian *= vec_magnitudes * feature_mask
+        feature_gradient_cartesian += this_feature_cartesian
 
-    all_locations = np.argwhere(feature_gradient_angles)
+    all_locations = np.argwhere(np.logical_or.reduce(assignments, axis=0))
     fy, fx = all_locations[:, 0], all_locations[:, 1]
-
-    feature_gradient_cartesian = np.array([np.sin(feature_gradient_angles),
-                                           np.cos(feature_gradient_angles)])
-    feature_gradient_cartesian *= feature_gradient_magnitudes
 
     transposed_coords = np.transpose(feature_gradient_cartesian[:, fy, fx])
     interpolator = scipy.interpolate.Rbf(fy, fx, transposed_coords, function='linear',
