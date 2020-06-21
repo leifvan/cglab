@@ -14,7 +14,8 @@ def calculate_dense_displacements(assignments, distances, directions, smooth):
     :param directions: An array (n_angles, height, width) of angles to the next edge pixel, i.e.
         directions[k, i, j] is the angle from [i,j] to the next edge pixel with angle k.
     :param smooth: L2-regularization factor for the RBFs.
-    :return:
+    :return: An array (2, height, width) of y and x displacements for each pixel, i.e. [:,i,j] is
+        the displacement (y,x) of pixel [i,j].
     """
     height, width = distances.shape[1:3]
     yy, xx = np.mgrid[:height, :width]
@@ -42,5 +43,4 @@ def calculate_dense_displacements(assignments, distances, directions, smooth):
     interpolator = scipy.interpolate.Rbf(fy, fx, transposed_coords, function='linear',
                                          smooth=smooth, mode='N-D')
     interpolated = interpolator(yy, xx)
-
-    return interpolated[...,0], interpolated[...,1]
+    return np.moveaxis(interpolated, 2, 0)
