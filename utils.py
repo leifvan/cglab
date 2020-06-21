@@ -85,18 +85,38 @@ class GifExporter:
 
 
 class NBestCollection:
-    def __init__(self, n, key, reverse=False):
-        self.cur_min = math.inf
-        # self.cur_max = -math.inf
+    """
+    A helper class to keep the n highest valued items (according to a key function) of a collection
+    in an online fashion.
+
+    The kept items are stored in the instance attribute ``items``.
+    """
+    def __init__(self, n, key=lambda x: x, reverse=False):
+        """
+        :param n: Number of best items to keep.
+        :param key: An optional key function that returns a value for items to be added. If not
+            given, it will use the numerical value of the items.
+        :param reverse: If ``True``, the negative value of ``key`` will be used, i.e. the n lowest
+            valued items are kept.
+        """
         self.items = []
+        """List of n best items, ordered from low (``self.items[0]``) to high (``self.items[-1]``)."""
         self.n = n
+        """Number of best items to keep."""
         self.key = key
+        """Function that returns the value of an item."""
+
         self.key_factor = -1 if reverse else 1
 
     def _key(self, value):
         return self.key_factor * self.key(value)
 
     def add(self, item):
+        """
+        Adds the given ``item`` if its value is one of n-th highest of the items seen so far.
+
+        :param item: The item to add.
+        """
         if len(self.items) < self.n:
             self.items.append(item)
             if len(self.items) == self.n:
