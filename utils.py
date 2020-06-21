@@ -6,7 +6,7 @@ import os
 import math
 
 
-def plot_diff(warped, target):
+def plot_diff(warped, target, axs=None):
     """
     Creates a figure with 3 images (from left to right):
 
@@ -18,16 +18,16 @@ def plot_diff(warped, target):
 
     :param warped: The warped image.
     :param target: The target image.
+    :param axs: Optional list of 3 axes to plot to. If ``None``, a new figure will be created.
     """
-    _, axs = plt.subplots(1, 3, figsize=(12, 4))
+    if axs is None:
+        _, axs = plt.subplots(1, 3, figsize=(12, 4))
     axs[0].imshow(warped, cmap='coolwarm', vmin=-1, vmax=1)
     axs[1].imshow(warped - target, cmap='coolwarm')
     axs[2].imshow(-target, cmap='coolwarm', vmin=-1, vmax=1)
 
     for ax in axs:
         ax.axis('off')
-
-    plt.tight_layout()
 
 
 def pad_slices(slices, padding, assert_shape=None):

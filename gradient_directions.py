@@ -157,6 +157,15 @@ def plot_polar_gradients(angles, magnitudes, ax=None):
     ax.imshow(vis)
 
 
+def plot_gradients_as_arrows(dy, dx, subsample=1, ax=None):
+    dy, dx = dy[::subsample, :: subsample], dx[::subsample, ::subsample]
+    ax = ax or plt.gca()
+    angles = (np.arctan2(dy, dx) + np.pi) / 2 / np.pi
+    ax.quiver(dy, dx, angles, cmap='hsv')
+    ax.set_aspect(dy.shape[1] / dy.shape[0])
+    ax.axis('off')
+
+
 def plot_binary_assignments(assignments, centroids, ax=None):
     ax = ax or plt.gca()
     all_assignments = np.sum(assignments * np.arange(1, len(assignments) + 1)[..., None, None], axis=0)
