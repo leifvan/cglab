@@ -38,7 +38,7 @@ feature_map[feature_map < 0.5] = 0
 
 patch_size = 80
 padding_size = 10
-pairs = find_promising_patch_pairs(feature_map, patch_size=patch_size, stride=8, num_pairs=1000)
+pairs = find_promising_patch_pairs(feature_map, patch_size=patch_size, stride=8, num_pairs=100)
 # for slice_a, slice_b, _ in pairs:
 #     patch_a = feature_map[slice_a]
 #     patch_b = feature_map[slice_b]
@@ -53,6 +53,7 @@ feature_window = feature_map[window_slice]
 
 assert feature_patch.shape == feature_window.shape
 
+
 # ---------------
 # get assignments
 # ---------------
@@ -62,16 +63,12 @@ def get_assignments_gabor(feature_map):
     assignments = get_binary_assignments_from_gabor(gabor_responses, threshold=0.1)
     return assignments, angles
 
+
 def get_assignments_clustered(feature_map):
     centroids, intervals = get_main_gradient_angles_and_intervals(feature_map)
     assignments = get_binary_assignments_from_centroids(feature_map, centroids, intervals)
-
-    # print
-    print("Found main angles:")
-    for angle_degrees, interval in zip(np.degrees(centroids), np.degrees(intervals)):
-        print(f"  {angle_degrees:.2f}° in [{interval[0]:.2f}°, {interval[1]:.2f}°]")
-
     return assignments, centroids
+
 
 def get_assignments_equidistant(feature_map):
     centroids, intervals = get_n_equidistant_angles_and_intervals(8)
@@ -100,7 +97,6 @@ plot_distance_transforms(distance_transforms, plt.subplots(2, 2)[1].ravel())
 plt.show()
 plot_feature_directions(feature_directions, plt.subplots(2, 2)[1].ravel())
 plt.show()
-
 
 plt.imshow(feature_patch - feature_window, cmap='coolwarm')
 plt.show()
@@ -140,7 +136,7 @@ for i in tqdm(range(n_iter)):
     warped_feature_patch[warped_feature_patch < 0.5] = 0
     plot_diff(warped_feature_patch, feature_window)
     gif_exporter.add_current_fig()
-    if i < n_iter-1:
+    if i < n_iter - 1:
         plt.close()
     else:
         plt.show()

@@ -99,7 +99,8 @@ class NBestCollection:
     def add(self, item):
         if len(self.items) < self.n:
             self.items.append(item)
-            self.items.sort(key=self._key)
+            if len(self.items) == self.n:
+                self.items.sort(key=self._key)
         elif self._key(item) > self._key(self.items[0]):
             self.items.pop(0)
             self.items.append(item)
