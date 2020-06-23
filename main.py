@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import skimage.transform
 from tqdm import tqdm
 
-from displacement import calculate_dense_displacements, plot_displacement_map
+from displacement import calculate_dense_displacements
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_closest_feature_directions_from_binary_assignments, get_binary_assignments_from_gabor
 from gradient_directions import get_main_gradient_angles_and_intervals, get_gradients_in_polar_coords, \
@@ -38,7 +38,7 @@ feature_map[feature_map < 0.5] = 0
 
 patch_size = 80
 padding_size = 10
-pairs = find_promising_patch_pairs(feature_map, patch_size=patch_size, stride=16, num_pairs=100)
+pairs = find_promising_patch_pairs(feature_map, patch_size=patch_size, stride=16, num_pairs=124)
 # for slice_a, slice_b, _ in pairs:
 #     patch_a = feature_map[slice_a]
 #     patch_b = feature_map[slice_b]

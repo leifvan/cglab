@@ -22,13 +22,9 @@ def calculate_dense_displacements(assignments, distances, directions, smooth):
     height, width = distances.shape[1:3]
     yy, xx = np.mgrid[:height, :width]
 
-    feature_gradient_cartesian = np.zeros((2, *distances.shape[1:]))
-
-    # TODO we don't need this for loop any more
-    for feature_mask, vec_magnitudes, vec_angles in zip(assignments, distances, directions):
-        this_feature_cartesian = np.array([np.sin(vec_angles), np.cos(vec_angles)])
-        this_feature_cartesian *= vec_magnitudes * feature_mask
-        feature_gradient_cartesian += this_feature_cartesian
+    feature_gradient_cartesian = np.array([np.sin(directions), np.cos(directions)])
+    feature_gradient_cartesian *= distances * assignments
+    feature_gradient_cartesian = feature_gradient_cartesian.sum(axis=1)
 
     all_locations = np.argwhere(np.logical_or.reduce(assignments, axis=0))
     fy, fx = all_locations[:, 0], all_locations[:, 1]
