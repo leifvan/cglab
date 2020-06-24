@@ -7,7 +7,8 @@ from tqdm import tqdm
 
 from displacement import calculate_dense_displacements
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
-    get_closest_feature_directions_from_binary_assignments, get_binary_assignments_from_gabor
+    get_closest_feature_directions_from_binary_assignments, get_binary_assignments_from_gabor, \
+    get_memberships_from_centroids
 from gradient_directions import get_main_gradient_angles_and_intervals, get_gradients_in_polar_coords, \
     plot_polar_gradients, plot_binary_assignments, plot_distance_transforms, plot_feature_directions, \
     get_n_equidistant_angles_and_intervals, apply_gabor_filters, plot_gradients_as_arrows
@@ -70,8 +71,9 @@ def get_assignments_clustered(feature_map):
     return assignments, centroids
 
 
+centroids, intervals = get_n_equidistant_angles_and_intervals(8)
+
 def get_assignments_equidistant(feature_map):
-    centroids, intervals = get_n_equidistant_angles_and_intervals(8)
     assignments = get_binary_assignments_from_centroids(feature_map, centroids, intervals)
     return assignments, centroids
 
@@ -84,6 +86,7 @@ get_assignments = get_assignments_equidistant
 
 assignments, angles = get_assignments(feature_map)
 plot_binary_assignments(assignments, angles)
+plt.title("binary assignments")
 plt.show()
 
 # -----------------------
@@ -105,8 +108,6 @@ plt.show()
 # get additional information for the patches
 # ------------------------------------------
 
-feature_patch_assignments = assignments[:, patch_slice[0], patch_slice[1]]
-feature_patch_directions = feature_directions[:, patch_slice[0], patch_slice[1]]
 feature_window_distances = distance_transforms[:, window_slice[0], window_slice[1]]
 feature_window_directions = feature_directions[:, window_slice[0], window_slice[1]]
 
@@ -114,14 +115,14 @@ feature_window_directions = feature_directions[:, window_slice[0], window_slice[
 # transform iteratively
 # ---------------------
 
-plot_feature_directions(feature_window_directions, plt.subplots(2, 2)[1].ravel())
+plot_feature_directions(feature_window_directions, plt.subplots(3, 3)[1].ravel())
 plt.show()
 
 warped_feature_patch = feature_patch.copy()
 grid = np.mgrid[:feature_patch.shape[0], :feature_patch.shape[1]].astype(np.float64)
 displacement = np.zeros_like(grid)
 
-# TODO the original diff is not in the exported gif
+# TODO the initial / unwarped diff is not in the exported gif
 plot_diff(warped_feature_patch, feature_window)
 plt.show()
 
@@ -130,8 +131,19 @@ n_iter = 50
 
 for i in tqdm(range(n_iter)):
     smooth = max(1000, 5e3 - 200 * i)
-    feature_patch_assignments, _ = get_assignments(warped_feature_patch)
-    warp_field = calculate_dense_displacements(feature_patch_assignments, feature_window_distances,
+    feature_patch_memberships = get_memberships_from_centroids(warped_feature_patch, centroids, intervals)
+
+    # _, axs = plt.subplots(3,3,figsize=(9,9))
+    # axs = axs.ravel()
+    #
+    # plot_polar_gradients(*get_gradients_in_polar_coords(warped_feature_patch), ax=axs[-1])
+    # for ax, angle, membership in zip(axs, centroids, feature_patch_memberships):
+    #     ax.imshow(membership, cmap='bone')
+    #     #plot_polar_gradients(feature_window_directions[i], np.ones_like(feature_window_directions[i]), ax)
+    #
+    # plt.show()
+
+    warp_field = calculate_dense_displacements(feature_patch_memberships, feature_window_distances,
                                                feature_window_directions, smooth=smooth)
 
     displacement += warp_field

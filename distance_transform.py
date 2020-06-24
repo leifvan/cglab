@@ -85,3 +85,19 @@ def get_closest_feature_directions_from_binary_assignments(assignments):
         directions[:] = np.arctan2(yy, xx)
 
     return directions_list
+
+
+def get_memberships_from_centroids(image, centroids, intervals):
+    angles, magnitudes = get_gradients_in_polar_coords(image)
+    memberships = np.zeros((len(centroids), *image.shape))
+    mask = ~np.isclose(magnitudes, 0, atol=0.2)
+
+    # TODO scale with interval widths
+    for membership, centroid in zip(memberships, centroids):
+        membership[mask] = np.maximum(0., np.cos(centroid-(angles[mask] + np.pi)))
+
+    # TODO is this needed? should be obsolete when scaling with interval widths
+    # normalize membership of each pixel to 1
+    memberships[:,mask] /= np.linalg.norm(memberships[:,mask], axis=0)
+
+    return memberships

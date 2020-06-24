@@ -5,6 +5,7 @@ from scipy.signal import find_peaks
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import matplotlib.cm as plt_cm
+import matplotlib.colors as plt_colors
 
 
 # https://arxiv.org/pdf/1601.05053.pdf
@@ -122,7 +123,8 @@ def get_n_equidistant_angles_and_intervals(n_angles):
     bounds_left = (centroids - centroids[1] / 2) % (2 * np.pi)
     bounds_right = centroids + centroids[1] / 2
     intervals = np.stack([bounds_left, bounds_right], axis=1)
-    return centroids, intervals
+    # TODO check for inconsistencies with ranges [-pi, pi] and [0, 2pi], ASSERTIONS!
+    return centroids-np.pi, intervals-np.pi
 
 
 def apply_gabor_filters(image, n_filters, **kwargs):
@@ -161,7 +163,8 @@ def plot_gradients_as_arrows(dy, dx, subsample=1, ax=None):
     dy, dx = dy[::subsample, :: subsample], dx[::subsample, ::subsample]
     ax = ax or plt.gca()
     angles = (np.arctan2(dy, dx) + np.pi) / 2 / np.pi
-    ax.quiver(dy, dx, angles, cmap='hsv')
+
+    ax.quiver(-dx, dy, angles, cmap='hsv', clim=(0.,1.))
     ax.set_aspect(dy.shape[1] / dy.shape[0])
     ax.axis('off')
 
