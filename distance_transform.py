@@ -1,4 +1,5 @@
 import numpy as np
+import numba as nb
 from scipy.ndimage import distance_transform_edt
 from gradient_directions import get_gradients_in_polar_coords
 
@@ -94,17 +95,40 @@ def get_closest_feature_directions_from_distance_transforms(distance_transforms)
     return directions_list
 
 
+@nb.vectorize
+def linear_ramp_membership(x, c_left, c, c_right):
+    if x < c_left or x > c_right:
+        return 0
+    elif x <= c:
+        return 1 - (x-c) / (c_left - c)
+    else:  # x > c
+        return 1 - (x-c) / (c_right - c)
+
+
 def get_memberships_from_centroids(image, centroids, intervals):
     angles, magnitudes = get_gradients_in_polar_coords(image)
     memberships = np.zeros((len(centroids), *image.shape))
     mask = ~np.isclose(magnitudes, 0, atol=0.2)
 
+    assert np.all(-np.pi <= centroids) and np.all(centroids <= np.pi)
+    assert np.all(-np.pi <= angles) and np.all(angles <= np.pi)
+
+
     # TODO scale with interval widths
-    for membership, centroid in zip(memberships, centroids):
-        membership[mask] = np.maximum(0., np.cos(centroid-(angles[mask] + np.pi)))
+    for membership, prev_c, cur_c, next_c in zip(memberships, np.roll(centroids,1),
+                                                 centroids, np.roll(centroids,-1)):
+        if prev_c > cur_c:
+            prev_c -= 2*np.pi
+        elif next_c < cur_c:
+            next_c += 2*np.pi
+
+        assert prev_c < cur_c < next_c
+
+        membership[mask] = linear_ramp_membership(angles[mask], prev_c, cur_c, next_c) ** 2
+        #membership[mask] = np.maximum(0., np.cos(centroid-(angles[mask] + np.pi)))
 
     # TODO is this needed? should be obsolete when scaling with interval widths
     # normalize membership of each pixel to 1
-    #memberships[:,mask] /= np.linalg.norm(memberships[:,mask], axis=0)
+    # memberships[:,mask] /= np.linalg.norm(memberships[:,mask], axis=0)
 
     return memberships

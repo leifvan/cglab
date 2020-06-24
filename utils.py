@@ -127,5 +127,13 @@ class NBestCollection:
             self.items.sort(key=self._key)
 
 
+def get_quadratic_subplot_for_n_axes(n, raveled_axes_only=False):
+    sqrt_n = math.ceil(math.sqrt(n))
+    fig, axs = plt.subplots(sqrt_n, sqrt_n, figsize=(3*sqrt_n, 4*sqrt_n))
+    if raveled_axes_only:
+        return axs.ravel()
+
+    return fig, axs
+
 def tight_layout_with_suptitle():
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
