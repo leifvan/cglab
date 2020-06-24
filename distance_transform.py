@@ -87,6 +87,13 @@ def get_closest_feature_directions_from_binary_assignments(assignments):
     return directions_list
 
 
+def get_closest_feature_directions_from_distance_transforms(distance_transforms):
+    directions_list = np.zeros_like(distance_transforms)
+    for directions, distance_transform in zip(directions_list, distance_transforms):
+        directions[:] = get_gradients_in_polar_coords(distance_transform)[0]
+    return directions_list
+
+
 def get_memberships_from_centroids(image, centroids, intervals):
     angles, magnitudes = get_gradients_in_polar_coords(image)
     memberships = np.zeros((len(centroids), *image.shape))
@@ -98,6 +105,6 @@ def get_memberships_from_centroids(image, centroids, intervals):
 
     # TODO is this needed? should be obsolete when scaling with interval widths
     # normalize membership of each pixel to 1
-    memberships[:,mask] /= np.linalg.norm(memberships[:,mask], axis=0)
+    #memberships[:,mask] /= np.linalg.norm(memberships[:,mask], axis=0)
 
     return memberships
