@@ -125,3 +125,7 @@ class NBestCollection:
             self.items.pop(0)
             self.items.append(item)
             self.items.sort(key=self._key)
+
+
+def tight_layout_with_suptitle():
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])

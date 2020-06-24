@@ -5,7 +5,8 @@ from scipy.signal import find_peaks
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import matplotlib.cm as plt_cm
-import matplotlib.colors as plt_colors
+import matplotlib as mpl
+from itertools import zip_longest
 
 
 # https://arxiv.org/pdf/1601.05053.pdf
@@ -177,11 +178,21 @@ def plot_binary_assignments(assignments, centroids, ax=None):
     plot_polar_gradients(angle_array, all_assignments != 0, ax)
 
 
-def plot_distance_transforms(distance_transforms, axes):
-    for dt, ax in zip(distance_transforms, axes):
+def plot_distance_transforms(distance_transforms, axes, angles=None):
+    if angles is None:
+        angles = [None] * len(distance_transforms)
+
+    for dt, ax, angle in zip(distance_transforms, axes, angles):
         ax.imshow(dt)
+        if angle is not None:
+            ax.set_title(f"{angle/np.pi*180}°")
 
 
-def plot_feature_directions(feature_directions, axes):
-    for fd, ax in zip(feature_directions, axes):
+def plot_feature_directions(feature_directions, axes, angles=None):
+    if angles is None:
+        angles = [None] * len(feature_directions)
+
+    for fd, ax, angle in zip(feature_directions, axes, angles):
         plot_polar_gradients(fd, np.ones_like(fd), ax)
+        if angle is not None:
+            ax.set_title(f"{angle/np.pi*180}°")
