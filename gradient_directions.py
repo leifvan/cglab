@@ -166,6 +166,7 @@ def plot_gradients_as_arrows(dy, dx, subsample=1, ax=None):
     angles = (np.arctan2(dy, dx) + np.pi) / 2 / np.pi
 
     ax.quiver(-dx, dy, angles, cmap='hsv', clim=(0.,1.))
+    ax.invert_yaxis()
     ax.set_aspect(dy.shape[1] / dy.shape[0])
     ax.axis('off')
 

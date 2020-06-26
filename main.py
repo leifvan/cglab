@@ -159,7 +159,7 @@ n_iter = 100
 errors = np.zeros(n_iter)
 
 for i in tqdm(range(n_iter)):
-    smooth = max(200, 6e3 - 200 * i)
+    smooth = max(400, 6e3 - 200 * i)
     feature_patch_memberships = get_memberships_from_centroids(warped_feature_patch, centroids, intervals)
     warp_field = calculate_dense_displacements(feature_patch_memberships, feature_window_distances,
                                                feature_window_directions, smooth=smooth)
@@ -174,7 +174,6 @@ for i in tqdm(range(n_iter)):
     _, axs = plt.subplots(2, 3, figsize=(12, 9))
     plot_diff(warped_feature_patch, feature_window, axs=axs[0])
     # TODO normalize displacement plotting of all figures
-    # TODO gradients are not plotted correctly!
     plot_gradients_as_arrows(*displacement, subsample=4, ax=axs[1, 0])
     plot_gradients_as_arrows(*warp_field, subsample=4, ax=axs[1, 1])
     plt.suptitle(f"{i + 1} / {n_iter}, smooth={smooth}")
