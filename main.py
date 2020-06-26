@@ -7,7 +7,7 @@ import numpy as np
 import skimage.transform
 from tqdm import tqdm
 
-from displacement import calculate_dense_displacements
+from displacement import calculate_dense_displacements, plot_correspondences
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_binary_assignments_from_gabor, get_memberships_from_centroids, \
     get_closest_feature_directions_from_distance_transforms, get_closest_feature_directions_from_binary_assignments
@@ -73,7 +73,7 @@ def get_assignments_clustered(feature_map):
     return assignments, centroids
 
 
-centroids, intervals = get_n_equidistant_angles_and_intervals(16)
+centroids, intervals = get_n_equidistant_angles_and_intervals(4)
 
 
 def get_assignments_equidistant(feature_map):
@@ -154,13 +154,22 @@ plot_diff(warped_feature_patch, feature_window)
 plt.show()
 
 gif_exporter = GifExporter()
-n_iter = 100
+gif_exporter_correspondences = GifExporter()
+n_iter = 40
+
 
 errors = np.zeros(n_iter)
 
 for i in tqdm(range(n_iter)):
     smooth = max(400, 6e3 - 200 * i)
     feature_patch_memberships = get_memberships_from_centroids(warped_feature_patch, centroids, intervals)
+
+    plt.figure(figsize=(8, 8))
+    plot_correspondences(warped_feature_patch, feature_window, centroids, feature_patch_memberships,
+                         feature_window_distances, feature_window_directions)
+    gif_exporter_correspondences.add_current_fig()
+    plt.close()
+
     warp_field = calculate_dense_displacements(feature_patch_memberships, feature_window_distances,
                                                feature_window_directions, smooth=smooth)
 
@@ -168,6 +177,8 @@ for i in tqdm(range(n_iter)):
     warped_feature_patch = skimage.transform.warp(feature_patch, grid + displacement, mode='constant')
     warped_feature_patch[warped_feature_patch > 0.5] = 1
     warped_feature_patch[warped_feature_patch < 0.5] = 0
+
+
 
     errors[i] = np.mean(np.abs(warped_feature_patch - feature_window))
     # plotting for gif output
@@ -178,7 +189,7 @@ for i in tqdm(range(n_iter)):
     plot_gradients_as_arrows(*warp_field, subsample=4, ax=axs[1, 1])
     plt.suptitle(f"{i + 1} / {n_iter}, smooth={smooth}")
     axs[1, 2].plot(errors[:i + 1])
-    axs[1, 2].set_xlim(0, 40)
+    axs[1, 2].set_xlim(0, n_iter)
     axs[1, 2].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
     #axs[1, 2].set_ylim(errors[:i+1].min(), errors[0])
     #axs[1, 2].set_ylim(0, errors[0])
@@ -192,3 +203,4 @@ for i in tqdm(range(n_iter)):
     # TODO save first and list image separately
 
 gif_exporter.save_gif("data/plot/plot.gif", duration=0.5)
+gif_exporter_correspondences.save_gif("data/plot/correspondences.gif", duration=0.5)

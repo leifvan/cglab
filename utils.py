@@ -1,4 +1,6 @@
 from matplotlib import pyplot as plt
+from matplotlib.colors import CSS4_COLORS, to_rgb
+import numpy as np
 import random
 import string
 import imageio
@@ -22,9 +24,12 @@ def plot_diff(warped, target, axs=None):
     """
     if axs is None:
         _, axs = plt.subplots(1, 3, figsize=(12, 4))
-    axs[0].imshow(warped, cmap='coolwarm', vmin=-1, vmax=1)
-    axs[1].imshow(warped - target, cmap='coolwarm')
-    axs[2].imshow(-target, cmap='coolwarm', vmin=-1, vmax=1)
+    # axs[0].imshow(warped, cmap='coolwarm', vmin=-1, vmax=1)
+    # axs[1].imshow(warped - target, cmap='coolwarm')
+    # axs[2].imshow(-target, cmap='coolwarm', vmin=-1, vmax=1)
+    axs[0].imshow(get_colored_difference_image(moving=warped))
+    axs[1].imshow(get_colored_difference_image(moving=warped, static=target))
+    axs[2].imshow(get_colored_difference_image(static=target))
 
     for ax in axs:
         ax.axis('off')
@@ -137,3 +142,20 @@ def get_quadratic_subplot_for_n_axes(n, raveled_axes_only=False):
 
 def tight_layout_with_suptitle():
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+
+def get_colored_difference_image(moving=None, static=None):
+    # TODO use the moving, static names everywhere in the code
+    if moving is None:
+        moving = np.zeros_like(static)
+    elif static is None:
+        static = np.zeros_like(moving)
+
+    image = np.ones((*moving.shape[:2], 3))
+    image[:] = to_rgb(CSS4_COLORS['white'])
+    moving_mask = np.isclose(moving, 1)
+    static_mask = np.isclose(static, 1)
+    image[moving_mask & ~static_mask] = to_rgb(CSS4_COLORS['indianred'])
+    image[~moving_mask & static_mask] = to_rgb(CSS4_COLORS['steelblue'])
+    image[moving_mask & static_mask] = to_rgb(CSS4_COLORS['gold'])
+    return image
