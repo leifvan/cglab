@@ -7,7 +7,7 @@ import numpy as np
 import skimage.transform
 from tqdm import tqdm
 
-from displacement import calculate_dense_displacements, plot_correspondences
+from displacement import calculate_dense_displacements, plot_correspondences, estimate_transform_from_binary_assignments
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_binary_assignments_from_gabor, get_memberships_from_centroids, \
     get_closest_feature_directions_from_distance_transforms, get_closest_feature_directions_from_binary_assignments
@@ -157,12 +157,14 @@ gif_exporter = GifExporter()
 gif_exporter_correspondences = GifExporter()
 n_iter = 40
 
-
 errors = np.zeros(n_iter)
+
+transform = None
 
 for i in tqdm(range(n_iter)):
     smooth = max(400, 6e3 - 200 * i)
     feature_patch_memberships = get_memberships_from_centroids(warped_feature_patch, centroids, intervals)
+    feature_patch_assignments = get_binary_assignments_from_centroids(warped_feature_patch, centroids, intervals)
 
     plt.figure(figsize=(8, 8))
     plot_correspondences(warped_feature_patch, feature_window, centroids, feature_patch_memberships,
@@ -170,29 +172,37 @@ for i in tqdm(range(n_iter)):
     gif_exporter_correspondences.add_current_fig()
     plt.close()
 
-    warp_field = calculate_dense_displacements(feature_patch_memberships, feature_window_distances,
-                                               feature_window_directions, smooth=smooth)
+    new_transform = estimate_transform_from_binary_assignments(feature_patch_assignments,
+                                                               feature_window_distances,
+                                                               feature_window_directions)
+    transform = new_transform if transform is None else new_transform + transform
+    #transform = new_transform if transform is None else new_transform @ transform
+    warped_feature_patch = skimage.transform.warp(feature_patch, transform)
+    # plot_diff(patch_t_warped, feature_window)
+    # plt.show()
+    # exit(0)
 
-    displacement += warp_field
-    warped_feature_patch = skimage.transform.warp(feature_patch, grid + displacement, mode='constant')
+    # warp_field = calculate_dense_displacements(feature_patch_memberships, feature_window_distances,
+    #                                            feature_window_directions, smooth=smooth)
+    #
+    # displacement += warp_field
+    # warped_feature_patch = skimage.transform.warp(feature_patch, grid + displacement, mode='constant')
     warped_feature_patch[warped_feature_patch > 0.5] = 1
     warped_feature_patch[warped_feature_patch < 0.5] = 0
-
-
 
     errors[i] = np.mean(np.abs(warped_feature_patch - feature_window))
     # plotting for gif output
     _, axs = plt.subplots(2, 3, figsize=(12, 9))
     plot_diff(warped_feature_patch, feature_window, axs=axs[0])
     # TODO normalize displacement plotting of all figures
-    plot_gradients_as_arrows(*displacement, subsample=4, ax=axs[1, 0])
-    plot_gradients_as_arrows(*warp_field, subsample=4, ax=axs[1, 1])
+    # plot_gradients_as_arrows(*displacement, subsample=4, ax=axs[1, 0])
+    # plot_gradients_as_arrows(*warp_field, subsample=4, ax=axs[1, 1])
     plt.suptitle(f"{i + 1} / {n_iter}, smooth={smooth}")
     axs[1, 2].plot(errors[:i + 1])
     axs[1, 2].set_xlim(0, n_iter)
     axs[1, 2].yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
-    #axs[1, 2].set_ylim(errors[:i+1].min(), errors[0])
-    #axs[1, 2].set_ylim(0, errors[0])
+    # axs[1, 2].set_ylim(errors[:i+1].min(), errors[0])
+    # axs[1, 2].set_ylim(0, errors[0])
     tight_layout_with_suptitle()
     gif_exporter.add_current_fig()
     # if i < n_iter - 1:

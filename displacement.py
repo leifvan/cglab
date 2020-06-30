@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from gradient_directions import plot_polar_gradients, plot_gradients_as_arrows
 from utils import get_colored_difference_image
+from skimage.transform import ProjectiveTransform, estimate_transform, AffineTransform
+from skimage.transform._geometric import _center_and_normalize_points
+from scipy.sparse.linalg import lsmr
 
 
 def calculate_dense_displacements(assignments, distances, directions, smooth):
@@ -46,8 +49,45 @@ def plot_correspondences(moving, static, centroids, assignments, distances, dire
     angles = np.array([np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
     uu, vv = angles * distances[aa, yy, xx]
     colors = hsv((centroids[aa] + np.pi) / 2 / np.pi)
-    colors[:,3] = assignments[aa,yy,xx]
-
+    colors[:, 3] = assignments[aa, yy, xx]
     ax.imshow(get_colored_difference_image(moving, static))
     ax.quiver(xx, yy, -vv, uu, angles='xy', scale_units='xy', scale=1,
               color=colors)
+
+
+def estimate_affine_transform(src, dst):
+    src_matrix, src = _center_and_normalize_points(src)
+    dst_matrix, dst = _center_and_normalize_points(dst)
+    n = len(src)
+    a = np.zeros((2 * n, 6))
+    b = np.concatenate([dst[:, 0], dst[:, 1]])
+
+    a[:n, 0] = src[:, 0]
+    a[:n, 1] = src[:, 1]
+    a[:n, 4] = 1
+    a[n:, 2] = src[:, 0]
+    a[n:, 3] = src[:, 1]
+    a[n:, 5] = 1
+
+    #lamb = 1
+    #x = np.linalg.inv(a.T @ a + (lamb ** 2) * np.eye(6)) @ a.T @ b
+
+    x = lsmr(a, b, damp=1)[0]
+    # x, residuals, rank, s = np.linalg.lstsq(a, b, rcond=None)
+    # x2 = np.linalg.lstsq(a,b)[0]
+    mat = np.array([*x[:2], x[4], *x[2:4], x[5], 0, 0, 1]).reshape((3, 3))
+    mat_transformed = np.linalg.inv(dst_matrix) @ mat @ src_matrix
+    return AffineTransform(matrix=mat_transformed)
+
+
+def estimate_transform_from_binary_assignments(assignments, distances, directions):
+    assert np.all((assignments == 0) | (assignments == 1))
+    aa, yy, xx = np.nonzero(assignments)
+    angles = np.array([np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
+    uu, vv = angles * distances[aa, yy, xx]
+    src = np.stack([xx, yy], axis=1)
+    dst = np.stack([xx + vv, yy + uu], axis=1)
+    # src = np.stack([yy, xx], axis=1)
+    # dst = np.stack([yy + vv, xx + uu], axis=1)
+    return estimate_affine_transform(src, dst)
+    # return estimate_transform('affine', src, dst)
