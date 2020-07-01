@@ -49,7 +49,7 @@ def plot_correspondences(moving, static, centroids, assignments, distances, dire
     angles = np.array([np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
     uu, vv = angles * distances[aa, yy, xx]
     colors = hsv((centroids[aa] + np.pi) / 2 / np.pi)
-    colors[:, 3] = assignments[aa, yy, xx]
+    colors[:, 3] = assignments[aa, yy, xx] * 0.5
     ax.imshow(get_colored_difference_image(moving, static))
     ax.quiver(xx, yy, -vv, uu, angles='xy', scale_units='xy', scale=1,
               color=colors)
