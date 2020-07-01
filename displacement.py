@@ -55,6 +55,11 @@ def plot_correspondences(moving, static, centroids, assignments, distances, dire
               color=colors)
 
 
+def get_energy(memberships, distances):
+    weighted_distances = memberships * distances
+    return weighted_distances.sum() / memberships.sum()
+
+
 def estimate_affine_transform(src, dst):
     src_matrix, src = _center_and_normalize_points(src)
     dst_matrix, dst = _center_and_normalize_points(dst)
@@ -72,7 +77,7 @@ def estimate_affine_transform(src, dst):
     #lamb = 1
     #x = np.linalg.inv(a.T @ a + (lamb ** 2) * np.eye(6)) @ a.T @ b
 
-    x = lsmr(a, b, damp=1)[0]
+    x = lsmr(a, b, damp=0)[0]
     # x, residuals, rank, s = np.linalg.lstsq(a, b, rcond=None)
     # x2 = np.linalg.lstsq(a,b)[0]
     mat = np.array([*x[:2], x[4], *x[2:4], x[5], 0, 0, 1]).reshape((3, 3))
@@ -89,5 +94,5 @@ def estimate_transform_from_binary_assignments(assignments, distances, direction
     dst = np.stack([xx + vv, yy + uu], axis=1)
     # src = np.stack([yy, xx], axis=1)
     # dst = np.stack([yy + vv, xx + uu], axis=1)
-    return estimate_affine_transform(src, dst)
-    # return estimate_transform('affine', src, dst)
+    #return estimate_affine_transform(src, dst)
+    return estimate_transform('projective', src, dst)

@@ -6,8 +6,11 @@ from matplotlib.ticker import FormatStrFormatter
 import numpy as np
 import skimage.transform
 from tqdm import tqdm
+import scipy.optimize
+from skimage.transform import AffineTransform
 
-from displacement import calculate_dense_displacements, plot_correspondences, estimate_transform_from_binary_assignments
+from displacement import calculate_dense_displacements, plot_correspondences, \
+    estimate_transform_from_binary_assignments, get_energy
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_binary_assignments_from_gabor, get_memberships_from_centroids, \
     get_closest_feature_directions_from_distance_transforms, get_closest_feature_directions_from_binary_assignments
@@ -171,6 +174,27 @@ for i in tqdm(range(n_iter)):
                          feature_window_distances, feature_window_directions)
     gif_exporter_correspondences.add_current_fig()
     plt.close()
+    e = get_energy(feature_patch_memberships, feature_window_distances)
+    print("energy",i,"=", e)
+
+    # def opt_wrapper(transform_params):
+    #     if np.isnan(transform_params).any():
+    #         return np.inf
+    #
+    #     sx, sy, rot, shear, tx, ty = transform_params
+    #     transform = AffineTransform(scale=(1+sx,1+sy), rotation=rot, shear=shear, translation=(tx, ty))
+    #     warped = skimage.transform.warp(warped_feature_patch, transform)
+    #
+    #     if np.isnan(warped).any():
+    #         return np.inf
+    #
+    #     memberships = get_memberships_from_centroids(warped, centroids, intervals)
+    #     return get_energy(memberships, feature_window_distances)
+    #
+    # result = scipy.optimize.basinhopping(opt_wrapper, x0=np.zeros(6), stepsize=1e-6, niter=10)
+    # sx, sy, rot, shear, tx, ty = result.x
+    # new_transform = AffineTransform(scale=(1+sx, 1+sy), rotation=rot, shear=shear, translation=(tx, ty))
+    #print(result)
 
     new_transform = estimate_transform_from_binary_assignments(feature_patch_assignments,
                                                                feature_window_distances,
