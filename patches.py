@@ -34,4 +34,4 @@ def find_promising_patch_pairs(feature_map, patch_size, stride=1, num_pairs=10):
         dist = np.linalg.norm(feature_map[slice_a] - feature_map[slice_b])
         best_indices.add((slice_a, slice_b, dist))
 
-    return best_indices.items
+    return tuple(best_indices.items)

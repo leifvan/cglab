@@ -10,6 +10,9 @@ from itertools import zip_longest
 
 
 # https://arxiv.org/pdf/1601.05053.pdf
+from utils import angle_to_rgb
+
+
 def wrapped_cauchy_kernel_density(theta, samples, weights, rho):
     """
     Evaluates the estimated density of 1D-samples at given positions ``theta``.
@@ -83,7 +86,7 @@ def cluster_density_by_extrema(x, y):
     return centroids, intervals
 
 
-def get_main_gradient_angles_and_intervals(feature_map):
+def get_main_gradient_angles_and_intervals(feature_map, rho=0.8):
     """
     Calculates a clustering of the gradient angles in ``feature_map``.
 
@@ -112,7 +115,7 @@ def get_main_gradient_angles_and_intervals(feature_map):
     scores = wrapped_cauchy_kernel_density(theta=sample_points[:, None],
                                            samples=angles[:, None],
                                            weights=magnitudes,
-                                           rho=0.8)
+                                           rho=rho)
 
     centroids, intervals = cluster_density_by_extrema(sample_points, scores)
 
@@ -151,10 +154,8 @@ def apply_gabor_filters(image, n_filters, **kwargs):
 
 def plot_polar_gradients(angles, magnitudes, ax=None):
     ax = ax or plt.gca()
-    hsv = plt_cm.get_cmap('hsv')
-
     vis = np.zeros((*angles.shape, 3))
-    vis[:] = hsv((angles + np.pi) / 2 / np.pi)[..., :3]
+    vis[:] = angle_to_rgb(angles)
     vis *= (magnitudes[..., None] / magnitudes.max())
 
     ax.imshow(vis)
