@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
 from matplotlib.colors import CSS4_COLORS, to_rgb
+import matplotlib.cm as plt_cm
 import numpy as np
 import random
 import string
@@ -58,6 +59,7 @@ class GifExporter:
     """
     A utility class for exporting matplotlib figures as a gif.
     """
+
     def __init__(self):
         self.image_paths = []
         os.makedirs("data/temp/", exist_ok=True)
@@ -96,6 +98,7 @@ class NBestCollection:
 
     The kept items are stored in the instance attribute ``items``.
     """
+
     def __init__(self, n, key=lambda x: x, reverse=False):
         """
         :param n: Number of best items to keep.
@@ -134,11 +137,12 @@ class NBestCollection:
 
 def get_quadratic_subplot_for_n_axes(n, raveled_axes_only=False):
     sqrt_n = math.ceil(math.sqrt(n))
-    fig, axs = plt.subplots(sqrt_n, sqrt_n, figsize=(3*sqrt_n, 4*sqrt_n))
+    fig, axs = plt.subplots(sqrt_n, sqrt_n, figsize=(3 * sqrt_n, 4 * sqrt_n))
     if raveled_axes_only:
         return axs.ravel()
 
     return fig, axs
+
 
 def tight_layout_with_suptitle():
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
@@ -159,3 +163,10 @@ def get_colored_difference_image(moving=None, static=None):
     image[~moving_mask & static_mask] = to_rgb(CSS4_COLORS['steelblue'])
     image[moving_mask & static_mask] = to_rgb(CSS4_COLORS['gold'])
     return image
+
+
+def get_slice_intersection(slices_a, slices_b):
+    return tuple([slice(max(a.start, b.start), min(a.stop, b.stop)) for a, b in zip(slices_a, slices_b)])
+
+def angle_to_rgb(angles):
+    return plt_cm.get_cmap('hsv')((angles + np.pi) / 2 / np.pi)[..., :3]
