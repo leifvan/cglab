@@ -9,6 +9,7 @@ import random
 import attr
 import os
 import string
+import time
 
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
@@ -42,6 +43,8 @@ class RunResult:
     intervals: np.ndarray = attr.ib()
 
     results: list = attr.ib()
+    warped_moving: list = attr.ib()
+
 
 
 RUNS_DIRECTORY = "data/runs"
@@ -127,7 +130,7 @@ moving, static = get_moving_and_static()
 intersection_slice = get_slice_intersection(patch_slice, window_slice)
 
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def plot_colored_feature_map():
     colored_map = 1 - np.tile(feature_map[..., None], reps=(1, 1, 3)) * 0.3
     colored_map[patch_slice[0], patch_slice[1], :] = get_colored_difference_image(moving=feature_map[patch_slice])
@@ -146,7 +149,7 @@ This is an overlay of the two chosen patches.
 '''
 
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def plot_moving_static_diff():
     plot_diff(moving, static)
     return figure_to_image()
@@ -230,7 +233,7 @@ def get_kde_plot_data():
     return sample_points, scores
 
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def plot_angles():
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='polar')
@@ -268,7 +271,7 @@ st.image(image=plot_angles())
 write_centroid_legend()
 
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def plot_assignments():
     _, axs = plt.subplots(1, 2, figsize=(8, 4))
     moving_assignments = get_binary_assignments_from_centroids(moving, centroids, intervals)
@@ -294,7 +297,7 @@ picked_angle_index = centroids_degrees.index(picked_angle)
 write_centroid_legend()
 
 
-@st.cache
+@st.cache(allow_output_mutation=True)
 def plot_memberships():
     plt.figure()
     memberships = get_memberships_from_centroids(moving, centroids, intervals)
@@ -334,85 +337,74 @@ num_iterations = st.number_input('number of iterations', min_value=1, max_value=
 config = RunConfiguration(patch_position, centroid_method, num_centroids, kde_rho, transform_type,
                           smoothness, num_iterations)
 
+def load_config_and_show():
+    config_path = config_paths[configs.index(config)].replace(CONFIG_SUFFIX, RESULTS_SUFFIX)
+    with open(os.path.join(RUNS_DIRECTORY, config_path), 'rb') as results_file:
+        run_result: RunResult = pickle.load(results_file)
+
+    result_index_placeholder = st.empty()
+    result_index = result_index_placeholder.slider(label="Pick frame", min_value=0,
+                                                   max_value=num_iterations,
+                                                   value=num_iterations, step=1,
+                                                   key="result_index_slider_initial")
+    animate_button = st.button(label='Animate')
+
+    @st.cache(allow_output_mutation=True)
+    def show_result(i):
+        if i == 0:
+            plot_diff(moving, static)
+        else:
+            plot_diff(run_result.warped_moving[i - 1], static)
+        return figure_to_image()
+
+    result_diff_placeholder = st.empty()
+
+    if animate_button:
+        for i in range(num_iterations + 1):
+            result_diff_placeholder.image(image=show_result(i), use_column_width=True)
+            result_index_placeholder.slider(label="Animating...", min_value=0, max_value=num_iterations,
+                                            value=i, step=1)
+            time.sleep(0.5)
+        result_index = result_index_placeholder.slider(label="Pick frame", min_value=0,
+                                                       max_value=num_iterations,
+                                                       value=num_iterations, step=1,
+                                                       key="result_index_slider_post_animate")
+
+    result_diff_placeholder.image(image=show_result(result_index), use_column_width=True)
+
 
 if config in configs:
-    with open(config_paths[configs.index(config)], 'rb') as results_file:
-        run_result = pickle.load(results_file)
-
+    load_config_and_show()
 
 elif st.button("Run calculation with above settings"):
     pbar = st.progress(0)
 
-    config = RunConfiguration(patch_position, centroid_method, num_centroids, kde_rho, transform_type)
     random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
     with open(os.path.join(RUNS_DIRECTORY, random_name+CONFIG_SUFFIX), 'wb') as config_file:
         pickle.dump(config, config_file)
 
     pbar.progress(10)
 
-    result_obj = RunResult(moving.copy(), static.copy(), centroids.copy(), intervals.copy(), None)
+    result_obj = RunResult(moving.copy(), static.copy(), centroids.copy(), intervals.copy(), None, None)
     # run calculation
     results = None
     if transform_type == 'linear transform':
         results = estimate_transform_from_correspondences(moving, static, num_iterations, centroids, intervals, True)
     elif transform_type == 'dense displacement':
+        # TODO binary/membership radio does not do anything yet
         results = estimate_dense_displacements_from_memberships(moving, static, num_iterations, centroids, intervals, smoothness, True)
 
     pbar.progress(90)
 
     result_obj.results = results
+    result_obj.warped_moving = [apply_transform(moving, r.stacked_transform) for r in results]
+
     with open(os.path.join(RUNS_DIRECTORY, random_name+RESULTS_SUFFIX), 'wb') as results_file:
         pickle.dump(result_obj, results_file)
 
     pbar.progress(100)
-    st.set_option()
+    config_paths.append(random_name+CONFIG_SUFFIX)
+    configs.append(config)
 
-    # run_calculation(centroid_method, transform_type, patch_position, smoothness)
+    load_config_and_show()
 
-# "# Results"
-# try:
-#     with open("results.pickle", 'rb') as pickle_file:
-#         results = pickle.load(pickle_file)
-#
-#     "## unwarped"
-#     plot_diff(feature_patch, feature_window)
-#     st.pyplot()
-#     "## final transform"
-#     warped = apply_transform(feature_patch, results[-1].stacked_transform)
-#     plot_diff(warped, feature_window)
-#     st.pyplot()
-#     "## pick iteration"
-#     result_index = st.slider(label='index', min_value=0, max_value=num_iterations, step=1, value=0)
-#     if result_index == 0:
-#         plot_diff(feature_patch, feature_window)
-#     else:
-#         warped = apply_transform(feature_patch, results[result_index-1].stacked_transform)
-#         plot_diff(warped, feature_window)
-#     st.pyplot()
-#
-#     _, axs = plt.subplots(1, 2, figsize=(8, 4))
-#     axs[0].plot([r.error for r in results])
-#     axs[0].set_title("error")
-#     axs[1].plot([r.energy for r in results])
-#     axs[1].set_title("energy")
-#     st.pyplot()
-#
-#     if transform_type == 'linear transform':
-#         centroids, intervals = get_centroids_intervals(centroid_method, patch_position)
-#         static_assignments = get_binary_assignments_from_centroids(feature_window, centroids, intervals)
-#         plt.figure(figsize=(9,9))
-#         plot_correspondences(moving=warped, static=feature_window, centroids=centroids,
-#                              assignments=get_binary_assignments_from_centroids(warped, centroids, intervals),
-#                              distances=get_distance_transforms_from_binary_assignments(static_assignments),
-#                              directions=get_closest_feature_directions_from_binary_assignments(static_assignments))
-#         st.pyplot()
-#     elif transform_type == 'dense displacement':
-#         if result_index > 0:
-#             grid = np.mgrid[:feature_patch.shape[0], :feature_patch.shape[1]]
-#             dy, dx = results[result_index-1].stacked_transform - grid
-#             plt.figure(figsize=(9,9))
-#             plot_gradients_as_arrows(dy, dx, subsample=2)
-#             st.pyplot()
-#
-# except FileNotFoundError:
-#     "No results found."

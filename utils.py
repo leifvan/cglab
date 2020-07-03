@@ -64,6 +64,10 @@ class GifExporter:
         self.image_paths = []
         os.makedirs("data/temp/", exist_ok=True)
 
+    def _get_random_filename(self):
+        random_filename = ''.join(random.choices(string.ascii_letters + string.digits, k=8))
+        return f"data/temp/{random_filename}.png"
+
     def add_current_fig(self):
         """
         Add the current matplotlib figure as the next image in the gif.
@@ -73,6 +77,18 @@ class GifExporter:
         path = f"data/temp/{random_filename}.png"
         plt.savefig(path)
         self.image_paths.append(path)
+
+    def add_image(self, image=None, path=None):
+        if image is not None and path is None:
+            path = self._get_random_filename()
+            imageio.imwrite(path, image)
+            self.image_paths.append(path)
+        elif image is None and path is not None:
+            # try to read to check if it is a valid image
+            imageio.imread(path)
+            self.image_paths.append(path)
+        raise Exception("Either image or path must be None.")
+
 
     def save_gif(self, path, duration=None):
         """
