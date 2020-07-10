@@ -50,15 +50,21 @@ class StreamlitProgressWrapper:
     def __init__(self, total):
         self.total = total
         self.n = 0
+        self.label = st.text(body=f"0 / {total}")
         self.pbar = st.progress(0.)
+        self.postfix = ""
+
+    def _update_label(self):
+        self.label.text(f"{self.n} / {self.total} | {self.postfix}")
 
     def update(self, delta):
         self.n += delta
+        self._update_label()
         self.pbar.progress(self.n / self.total)
 
-    def set_postfix(self, *args, **kwargs):
-        print("set_postfix currently unsupported.")
-
+    def set_postfix(self, postfix):
+        self.postfix = postfix
+        self._update_label()
 
 
 RUNS_DIRECTORY = "data/runs"
@@ -313,12 +319,32 @@ write_centroid_legend()
 
 
 @st.cache(allow_output_mutation=True)
+def get_moving_assignments_memberships():
+    assignments = get_binary_assignments_from_centroids(moving, centroids, intervals)
+    memberships = get_memberships_from_centroids(moving, centroids, intervals)
+    return assignments, memberships
+
+
+moving_assignments, moving_memberships = get_moving_assignments_memberships()
+
+
+@st.cache(allow_output_mutation=True)
+def get_static_assignments_distances_directions():
+    assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
+    distances = get_distance_transforms_from_binary_assignments(assignments)
+    directions = get_closest_feature_directions_from_binary_assignments(assignments)
+    return assignments, distances, directions
+
+
+static_assignments, static_distances, static_directions = get_static_assignments_distances_directions()
+
+
+@st.cache(allow_output_mutation=True)
 def plot_memberships():
     plt.figure()
-    memberships = get_memberships_from_centroids(moving, centroids, intervals)
     color = centroids_colors[picked_angle_index]
     membership_image = np.tile(moving[..., None], reps=(1, 1, 3)) * 0.2
-    membership_image += 0.8 * memberships[picked_angle_index, ..., None] * color
+    membership_image += 0.8 * moving_memberships[picked_angle_index, ..., None] * color
     plt.imshow(membership_image)
     return figure_to_image()
 
@@ -334,23 +360,46 @@ Based on the directions, we can now fit a transformation.
 
 transform_type = st.radio(label='transform type', options=("linear transform",
                                                            "dense displacement"))
+smoothness = None
+if transform_type == "linear transform":
+    r'''
+    Fit a *projective transformation* based on the following correspondences. The correspondences
+    are determined using the distance transformations of the binary map of each main angle. More
+    specifically, for a main direction $\phi$ and its interval $[a, b]$, we get two binary images
+    $M_\phi[i,j]$ and $S_\phi[i,j]$ indicating the pixels with a gradient angle in $[a,b]$
+    for the moving and the static image, respectively. For every pixel $(i,j)$ where $M_\phi[i,j] = 1$
+    we can find a closest pixel $(i',j')$ with $S_\phi[i',j'] = 1$. These pairs are the
+    correspondences.
+    
+    Below all correspondences are drawn as arrows from pixel $(i,j)$ in $M$ to the pixel $(i',j')$
+    in $S$. The coloring denotes from which main direction $\phi$ the correspondence originates.
+    '''
 
-if transform_type == 'dense displacement':
+
+    write_centroid_legend()
+
+    @st.cache(allow_output_mutation=True)
+    def plot_binary_correspondences():
+        plt.figure()
+        plot_correspondences(moving, static, centroids, moving_assignments, static_distances, static_directions)
+        plt.tight_layout()
+        return figure_to_image()
+
+    st.image(plot_binary_correspondences())
+
+elif transform_type == 'dense displacement':
     assignment_type = st.radio('assignment type', options=("binary", "memberships"))
     smoothness = st.slider('warp field smoothness', min_value=0, max_value=10000, value=2000)
-else:
-    smoothness = None
 
 num_iterations = st.number_input('number of iterations', min_value=1, max_value=100, value=20)
-
 
 '''
 ### Results
 '''
 
-
 config = RunConfiguration(patch_position, centroid_method, num_centroids, kde_rho, transform_type,
                           smoothness, num_iterations)
+
 
 def load_config_and_show():
     config_path = config_paths[configs.index(config)].replace(CONFIG_SUFFIX, RESULTS_SUFFIX)
@@ -364,7 +413,7 @@ def load_config_and_show():
                                                    key="result_index_slider_initial")
     animate_button = st.button(label='Animate')
 
-    @st.cache(allow_output_mutation=True)
+    @st.cache(allow_output_mutation=True, show_spinner=False)
     def show_result(i):
         if i == 0:
             plot_diff(moving, static)
@@ -387,6 +436,14 @@ def load_config_and_show():
 
     result_diff_placeholder.image(image=show_result(result_index), use_column_width=True)
 
+    def plot_error():
+        plt.figure()
+        plt.plot([r.error for r in run_result.results])
+        plt.title("mean absolute error")
+        return figure_to_image()
+
+    st.image(image=plot_error())
+
 
 if config in configs:
     load_config_and_show()
@@ -395,27 +452,28 @@ elif st.button("Run calculation with above settings"):
     pbar = StreamlitProgressWrapper(total=num_iterations)
 
     random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
-    with open(os.path.join(RUNS_DIRECTORY, random_name+CONFIG_SUFFIX), 'wb') as config_file:
+    with open(os.path.join(RUNS_DIRECTORY, random_name + CONFIG_SUFFIX), 'wb') as config_file:
         pickle.dump(config, config_file)
 
     result_obj = RunResult(moving.copy(), static.copy(), centroids.copy(), intervals.copy(), None, None)
     # run calculation
     results = None
     if transform_type == 'linear transform':
-        results = estimate_transform_from_correspondences(moving, static, num_iterations, centroids, intervals, pbar)
+        results = estimate_transform_from_correspondences(moving, static, num_iterations, centroids,
+                                                          intervals, pbar)
     elif transform_type == 'dense displacement':
         # TODO binary/membership radio does not do anything yet
-        results = estimate_dense_displacements_from_memberships(moving, static, num_iterations, centroids, intervals, smoothness, pbar)
-
+        results = estimate_dense_displacements_from_memberships(moving, static, num_iterations,
+                                                                centroids, intervals,
+                                                                smoothness, pbar)
 
     result_obj.results = results
     result_obj.warped_moving = [apply_transform(moving, r.stacked_transform) for r in results]
 
-    with open(os.path.join(RUNS_DIRECTORY, random_name+RESULTS_SUFFIX), 'wb') as results_file:
+    with open(os.path.join(RUNS_DIRECTORY, random_name + RESULTS_SUFFIX), 'wb') as results_file:
         pickle.dump(result_obj, results_file)
 
-    config_paths.append(random_name+CONFIG_SUFFIX)
+    config_paths.append(random_name + CONFIG_SUFFIX)
     configs.append(config)
 
     load_config_and_show()
-
