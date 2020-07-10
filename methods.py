@@ -28,14 +28,14 @@ def _get_error(moving, static):
     return np.mean(np.abs(moving - static))
 
 
-def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter, show_progressbar=False):
+def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter, progress_bar=None):
     transform = None
     warped_moving = original_moving.copy()
 
     results = []
 
-    iterations = tqdm(range(n_iter), disable=not show_progressbar)
-    for _ in iterations:
+    #iterations = tqdm(range(n_iter), disable=not show_progressbar)
+    for _ in range(n_iter):
         transform = estimate_fn(warped_moving, static, transform)
         warped_moving = apply_transform(original_moving, transform)
 
@@ -55,12 +55,15 @@ def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter, sho
                                  error=_get_error(warped_moving, static),
                                  energy=get_energy(memberships, distances))
         results.append(result)
-        iterations.set_postfix(dict(error=result.error))
+
+        if progress_bar:
+            progress_bar.update(1)
+            progress_bar.set_postfix(dict(error=result.error))
 
     return results
 
 
-def estimate_transform_from_correspondences(moving, static, n_iter, centroids, intervals, verbose=False):
+def estimate_transform_from_correspondences(moving, static, n_iter, centroids, intervals, progress_bar=None):
     # TODO previously we used the whole image for that to also be aware of the surroundings
     static_assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
     static_distances = get_distance_transforms_from_binary_assignments(static_assignments)
@@ -74,10 +77,10 @@ def estimate_transform_from_correspondences(moving, static, n_iter, centroids, i
         # we use transform classes from skimage here, they can be concatenated with +
         return transform if previous_transform is None else transform + previous_transform
 
-    return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter, show_progressbar=verbose)
+    return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter, progress_bar)
 
 
-def estimate_dense_displacements_from_memberships(moving, static, n_iter, centroids, intervals, smooth, verbose=False):
+def estimate_dense_displacements_from_memberships(moving, static, n_iter, centroids, intervals, smooth, progress_bar=None):
     static_assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
     static_distances = get_distance_transforms_from_binary_assignments(static_assignments)
     static_directions = get_closest_feature_directions_from_binary_assignments(static_assignments)
@@ -90,10 +93,10 @@ def estimate_dense_displacements_from_memberships(moving, static, n_iter, centro
                                                    static_directions, smooth)
         return previous_transform + warp_field
 
-    return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter, show_progressbar=verbose)
+    return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter, progress_bar)
 
 
-def estimate_transform_by_minimizing_energy(moving, static, n_iter, centroids, intervals, smooth, verbose=False):
+def estimate_transform_by_minimizing_energy(moving, static, n_iter, centroids, intervals, smooth, progress_bar=None):
     static_assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
     static_distances = get_distance_transforms_from_binary_assignments(static_assignments)
 
@@ -113,15 +116,16 @@ def estimate_transform_by_minimizing_energy(moving, static, n_iter, centroids, i
 
     results = []
 
-    with tqdm(total=n_iter, disable=not verbose) as pbar:
-        def callback(x, energy, success):
-            sx, sy, rot, shear, tx, ty = x
-            transform = AffineTransform(scale=(1 + sx, 1 + sy), rotation=rot, shear=shear, translation=(tx, ty))
-            warped = apply_transform(moving, transform)
-            results.append(TransformResult(transform, error=_get_error(warped, static),
-                                           energy=energy))
-            pbar.update(1)
-            pbar.set_postfix(dict(energy=energy))
+    def callback(x, energy, success):
+        sx, sy, rot, shear, tx, ty = x
+        transform = AffineTransform(scale=(1 + sx, 1 + sy), rotation=rot, shear=shear, translation=(tx, ty))
+        warped = apply_transform(moving, transform)
+        results.append(TransformResult(transform, error=_get_error(warped, static),
+                                       energy=energy))
+
+        if progress_bar:
+            progress_bar.update(1)
+            progress_bar.set_postfix(dict(energy=energy))
 
         scipy.optimize.basinhopping(opt_wrapper, x0=np.zeros(6), stepsize=1e-6, niter=n_iter, callback=callback)
     return results

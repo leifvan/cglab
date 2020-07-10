@@ -46,6 +46,20 @@ class RunResult:
     warped_moving: list = attr.ib()
 
 
+class StreamlitProgressWrapper:
+    def __init__(self, total):
+        self.total = total
+        self.n = 0
+        self.pbar = st.progress(0.)
+
+    def update(self, delta):
+        self.n += delta
+        self.pbar.progress(self.n / self.total)
+
+    def set_postfix(self, *args, **kwargs):
+        print("set_postfix currently unsupported.")
+
+
 
 RUNS_DIRECTORY = "data/runs"
 CONFIG_SUFFIX = ".config"
@@ -63,6 +77,7 @@ def figure_to_image():
     canvas = plt.gcf().canvas
     canvas.draw()
     buf = canvas.buffer_rgba()
+    plt.close()
     return np.asarray(buf)
 
 
@@ -377,24 +392,21 @@ if config in configs:
     load_config_and_show()
 
 elif st.button("Run calculation with above settings"):
-    pbar = st.progress(0)
+    pbar = StreamlitProgressWrapper(total=num_iterations)
 
     random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
     with open(os.path.join(RUNS_DIRECTORY, random_name+CONFIG_SUFFIX), 'wb') as config_file:
         pickle.dump(config, config_file)
 
-    pbar.progress(10)
-
     result_obj = RunResult(moving.copy(), static.copy(), centroids.copy(), intervals.copy(), None, None)
     # run calculation
     results = None
     if transform_type == 'linear transform':
-        results = estimate_transform_from_correspondences(moving, static, num_iterations, centroids, intervals, True)
+        results = estimate_transform_from_correspondences(moving, static, num_iterations, centroids, intervals, pbar)
     elif transform_type == 'dense displacement':
         # TODO binary/membership radio does not do anything yet
-        results = estimate_dense_displacements_from_memberships(moving, static, num_iterations, centroids, intervals, smoothness, True)
+        results = estimate_dense_displacements_from_memberships(moving, static, num_iterations, centroids, intervals, smoothness, pbar)
 
-    pbar.progress(90)
 
     result_obj.results = results
     result_obj.warped_moving = [apply_transform(moving, r.stacked_transform) for r in results]
@@ -402,7 +414,6 @@ elif st.button("Run calculation with above settings"):
     with open(os.path.join(RUNS_DIRECTORY, random_name+RESULTS_SUFFIX), 'wb') as results_file:
         pickle.dump(result_obj, results_file)
 
-    pbar.progress(100)
     config_paths.append(random_name+CONFIG_SUFFIX)
     configs.append(config)
 
