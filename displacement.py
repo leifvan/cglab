@@ -59,19 +59,34 @@ def get_energy(memberships, distances):
     return weighted_distances.sum() / memberships.sum()
 
 
-def estimate_affine_transform(src, dst):
+def estimate_projective_transform(src, dst, weights=None):
     src_matrix, src = _center_and_normalize_points(src)
     dst_matrix, dst = _center_and_normalize_points(dst)
     n = len(src)
-    a = np.zeros((2 * n, 6))
+    a = np.zeros((2 * n, 8))
     b = np.concatenate([dst[:, 0], dst[:, 1]])
+
+    if weights is None:
+        weights = np.ones(n)
+
+    sqrt_weights = np.sqrt(weights)
+
+    b[:n] *= sqrt_weights
+    b[n:] *= sqrt_weights
 
     a[:n, 0] = src[:, 0]
     a[:n, 1] = src[:, 1]
-    a[:n, 4] = 1
-    a[n:, 2] = src[:, 0]
-    a[n:, 3] = src[:, 1]
+    a[:n, 2] = 1
+    a[:n, 6] = -src[:, 0] * dst[:, 0]
+    a[:n, 7] = -src[:, 1] * dst[:, 0]
+    a[:n] *= sqrt_weights[...,None]
+
+    a[n:, 3] = src[:, 0]
+    a[n:, 4] = src[:, 1]
     a[n:, 5] = 1
+    a[n:, 6] = -src[:, 0] * dst[:, 1]
+    a[n:, 7] = -src[:, 1] * dst[:, 1]
+    a[n:] *= sqrt_weights[...,None]
 
     #lamb = 1
     #x = np.linalg.inv(a.T @ a + (lamb ** 2) * np.eye(6)) @ a.T @ b
@@ -79,19 +94,28 @@ def estimate_affine_transform(src, dst):
     x = lsmr(a, b, damp=0)[0]
     # x, residuals, rank, s = np.linalg.lstsq(a, b, rcond=None)
     # x2 = np.linalg.lstsq(a,b)[0]
-    mat = np.array([*x[:2], x[4], *x[2:4], x[5], 0, 0, 1]).reshape((3, 3))
+    mat = np.array([*x, 1]).reshape((3, 3))
     mat_transformed = np.linalg.inv(dst_matrix) @ mat @ src_matrix
-    return AffineTransform(matrix=mat_transformed)
+    return ProjectiveTransform(matrix=mat_transformed)
 
 
-def estimate_transform_from_binary_assignments(assignments, distances, directions):
-    assert np.all((assignments == 0) | (assignments == 1))
-    aa, yy, xx = np.nonzero(assignments)
+# def estimate_transform_from_binary_assignments(assignments, distances, directions):
+#     assert np.all((assignments == 0) | (assignments == 1))
+#     aa, yy, xx = np.nonzero(assignments)
+#     angles = np.array([np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
+#     uu, vv = angles * distances[aa, yy, xx]
+#     src = np.stack([xx, yy], axis=1)
+#     dst = np.stack([xx + vv, yy + uu], axis=1)
+#     # src = np.stack([yy, xx], axis=1)
+#     # dst = np.stack([yy + vv, xx + uu], axis=1)
+#     #return estimate_affine_transform(src, dst)
+#     return estimate_projective_transform(src, dst)
+
+
+def estimate_transform_from_memberships(memberships, distances, directions):
+    aa, yy, xx = np.nonzero(memberships)
     angles = np.array([np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
     uu, vv = angles * distances[aa, yy, xx]
     src = np.stack([xx, yy], axis=1)
     dst = np.stack([xx + vv, yy + uu], axis=1)
-    # src = np.stack([yy, xx], axis=1)
-    # dst = np.stack([yy + vv, xx + uu], axis=1)
-    #return estimate_affine_transform(src, dst)
-    return estimate_transform('projective', src, dst)
+    return estimate_projective_transform(src, dst, weights=memberships[aa, yy, xx])
