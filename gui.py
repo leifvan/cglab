@@ -10,6 +10,7 @@ import attr
 import os
 import string
 import time
+from functools import partial
 
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
@@ -17,21 +18,29 @@ from distance_transform import get_binary_assignments_from_centroids, get_distan
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids
 from patches import find_promising_patch_pairs
 from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
-from methods import estimate_transform_from_correspondences, apply_transform, \
-    estimate_dense_displacements_from_memberships
+from methods import estimate_transform_from_binary_correspondences, estimate_transform_from_soft_correspondences, \
+    estimate_dense_displacements_from_memberships, estimate_dense_displacements_from_binary_assignments, \
+    apply_transform
 from displacement import plot_correspondences
 
 
-@attr.s
+@attr.s(frozen=True)
 class RunConfiguration:
     # TODO also save feature map (path)
-    patch_position: int = attr.ib()
-    centroid_method: str = attr.ib()
-    num_centroids: int = attr.ib()
-    kde_rho: float = attr.ib()
-    transform_type: str = attr.ib()
-    smoothness: int = attr.ib()
-    num_iterations: int = attr.ib()
+    patch_position: int = attr.ib(default=None)
+    centroid_method: str = attr.ib(default=None)
+    num_centroids: int = attr.ib(default=None)
+    kde_rho: float = attr.ib(default=None)
+    assignment_type: str = attr.ib(default=None)
+    transform_type: str = attr.ib(default=None)
+    smoothness: int = attr.ib(default=None)
+    num_iterations: int = attr.ib(default=None)
+
+    def fulfills(self, proto_config):
+        attr_names = attr.fields_dict(RunConfiguration)
+        reduced_self = RunConfiguration(**{n: getattr(self, n) for n in attr_names
+                                           if getattr(proto_config, n) is not None})
+        return reduced_self == proto_config
 
 
 @attr.s
@@ -60,7 +69,10 @@ class StreamlitProgressWrapper:
     def update(self, delta):
         self.n += delta
         self._update_label()
-        self.pbar.progress(self.n / self.total)
+        if self.n <= self.total:
+            self.pbar.progress(self.n / self.total)
+        else:
+            print("Warning: progress bar >100%")
 
     def set_postfix(self, postfix):
         self.postfix = postfix
@@ -327,6 +339,8 @@ def get_moving_assignments_memberships():
 
 moving_assignments, moving_memberships = get_moving_assignments_memberships()
 
+assignment_type = st.radio('assignment type', options=("binary", "memberships"))
+
 
 @st.cache(allow_output_mutation=True)
 def get_static_assignments_distances_directions():
@@ -375,8 +389,8 @@ if transform_type == "linear transform":
     in $S$. The coloring denotes from which main direction $\phi$ the correspondence originates.
     '''
 
-
     write_centroid_legend()
+
 
     @st.cache(allow_output_mutation=True)
     def plot_binary_correspondences():
@@ -385,10 +399,38 @@ if transform_type == "linear transform":
         plt.tight_layout()
         return figure_to_image()
 
+
     st.image(plot_binary_correspondences())
 
+    r'''
+    The projective transform
+    $$
+    \begin{pmatrix}
+    m_1 & m_2 & t_1 \\
+    m_3 & m_4 & t_2 \\
+    c_1 & c_2 & 1
+    \end{pmatrix}
+    $$
+    induces the following system of linear equations
+    $$
+    \begin{pmatrix}
+    \vdots \\
+    \begin{matrix}
+        i & j & 1 & 0 & 0 & 0 & -i\cdot i' & -j\cdot i' \\
+        0 & 0 & 0 & i & j & 1 & -i\cdot j' & -j\cdot j'
+    \end{matrix} \\
+    \vdots
+    \end{pmatrix}
+    \begin{pmatrix}
+    m_1 \\ m_2 \\ t_1 \\ m_3 \\ m_4 \\ t_2 \\ c_1 \\ c_2 
+    \end{pmatrix} = 
+    \begin{pmatrix}
+        i' \\ j'
+    \end{pmatrix}
+    $$
+    '''
+
 elif transform_type == 'dense displacement':
-    assignment_type = st.radio('assignment type', options=("binary", "memberships"))
     smoothness = st.slider('warp field smoothness', min_value=0, max_value=10000, value=2000)
 
 num_iterations = st.number_input('number of iterations', min_value=1, max_value=100, value=20)
@@ -397,8 +439,10 @@ num_iterations = st.number_input('number of iterations', min_value=1, max_value=
 ### Results
 '''
 
-config = RunConfiguration(patch_position, centroid_method, num_centroids, kde_rho, transform_type,
-                          smoothness, num_iterations)
+config = RunConfiguration(patch_position=patch_position, centroid_method=centroid_method,
+                          num_centroids=num_centroids, kde_rho=kde_rho,
+                          assignment_type=assignment_type, transform_type=transform_type,
+                          smoothness=smoothness, num_iterations=num_iterations)
 
 
 def load_config_and_show():
@@ -411,9 +455,10 @@ def load_config_and_show():
                                                    max_value=num_iterations,
                                                    value=num_iterations, step=1,
                                                    key="result_index_slider_initial")
-    animate_button = st.button(label='Animate')
 
-    @st.cache(allow_output_mutation=True, show_spinner=False)
+    animate_button_placeholder = st.empty()
+
+    @st.cache(allow_output_mutation=True)
     def show_result(i):
         if i == 0:
             plot_diff(moving, static)
@@ -423,7 +468,7 @@ def load_config_and_show():
 
     result_diff_placeholder = st.empty()
 
-    if animate_button:
+    if animate_button_placeholder.button(label='Animate'):
         for i in range(num_iterations + 1):
             result_diff_placeholder.image(image=show_result(i), use_column_width=True)
             result_index_placeholder.slider(label="Animating...", min_value=0, max_value=num_iterations,
@@ -438,8 +483,8 @@ def load_config_and_show():
 
     def plot_error():
         plt.figure()
-        plt.plot([r.error for r in run_result.results])
-        plt.title("mean absolute error")
+        plt.plot([r.energy for r in run_result.results])
+        plt.title("energy")
         return figure_to_image()
 
     st.image(image=plot_error())
@@ -451,29 +496,56 @@ if config in configs:
 elif st.button("Run calculation with above settings"):
     pbar = StreamlitProgressWrapper(total=num_iterations)
 
-    random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
-    with open(os.path.join(RUNS_DIRECTORY, random_name + CONFIG_SUFFIX), 'wb') as config_file:
-        pickle.dump(config, config_file)
-
-    result_obj = RunResult(moving.copy(), static.copy(), centroids.copy(), intervals.copy(), None, None)
     # run calculation
     results = None
-    if transform_type == 'linear transform':
-        results = estimate_transform_from_correspondences(moving, static, num_iterations, centroids,
-                                                          intervals, pbar)
-    elif transform_type == 'dense displacement':
-        # TODO binary/membership radio does not do anything yet
-        results = estimate_dense_displacements_from_memberships(moving, static, num_iterations,
-                                                                centroids, intervals,
-                                                                smoothness, pbar)
+    common_params = dict(moving=moving, static=static, n_iter=num_iterations, centroids=centroids,
+                         intervals=intervals, progress_bar=pbar)
+    config_to_method_fn_map = {RunConfiguration(transform_type='linear transform',
+                                                assignment_type='binary'):
+                                   partial(estimate_transform_from_binary_correspondences,
+                                           **common_params),
+                               RunConfiguration(transform_type='linear transform',
+                                                assignment_type='memberships'):
+                                   partial(estimate_transform_from_soft_correspondences,
+                                           **common_params),
+                               RunConfiguration(transform_type='dense displacement',
+                                                assignment_type='binary'):
+                                   partial(estimate_dense_displacements_from_binary_assignments,
+                                           **common_params, smooth=smoothness),
+                               RunConfiguration(transform_type='dense displacement',
+                                                assignment_type='memberships'):
+                                   partial(estimate_dense_displacements_from_memberships,
+                                           **common_params, smooth=smoothness)}
 
-    result_obj.results = results
-    result_obj.warped_moving = [apply_transform(moving, r.stacked_transform) for r in results]
+    # find the first fitting config from the map
+    for proto_config, fn in config_to_method_fn_map.items():
+        if config.fulfills(proto_config):
+            results = fn()
+            break
 
-    with open(os.path.join(RUNS_DIRECTORY, random_name + RESULTS_SUFFIX), 'wb') as results_file:
-        pickle.dump(result_obj, results_file)
+    if results is None:
+        st.error("Failed to run config!")
+    else:
+        random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
+        with open(os.path.join(RUNS_DIRECTORY, random_name + CONFIG_SUFFIX), 'wb') as config_file:
+            pickle.dump(config, config_file)
 
-    config_paths.append(random_name + CONFIG_SUFFIX)
-    configs.append(config)
+        result_obj = RunResult(moving=moving.copy(), static=static.copy(), centroids=centroids.copy(),
+                               intervals=intervals.copy(), results=results,
+                               warped_moving=[apply_transform(moving, r.stacked_transform) for r in results])
+        with open(os.path.join(RUNS_DIRECTORY, random_name + RESULTS_SUFFIX), 'wb') as results_file:
+            pickle.dump(result_obj, results_file)
 
-    load_config_and_show()
+        config_paths.append(random_name + CONFIG_SUFFIX)
+        configs.append(config)
+
+        # if transform_type == 'linear transform':
+        #     results = estimate_transform_from_correspondences(moving, static, num_iterations, centroids,
+        #                                                       intervals, pbar)
+        # elif transform_type == 'dense displacement':
+        #     # TODO binary/membership radio does not do anything yet
+        #     results = estimate_dense_displacements_from_memberships(moving, static, num_iterations,
+        #                                                             centroids, intervals,
+        #                                                             smoothness, pbar)
+
+        load_config_and_show()
