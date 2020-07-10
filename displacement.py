@@ -3,7 +3,7 @@ import scipy.interpolate
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from gradient_directions import plot_polar_gradients, plot_gradients_as_arrows
-from utils import get_colored_difference_image
+from utils import get_colored_difference_image, angle_to_rgb
 from skimage.transform import ProjectiveTransform, estimate_transform, AffineTransform
 from skimage.transform._geometric import _center_and_normalize_points
 from scipy.sparse.linalg import lsmr
@@ -44,11 +44,10 @@ def calculate_dense_displacements(assignments, distances, directions, smooth):
 def plot_correspondences(moving, static, centroids, assignments, distances, directions, ax=None):
     ax = ax or plt.gca()
     assert np.all(assignments <= 1)
-    hsv = mpl.cm.get_cmap('hsv')
     aa, yy, xx = np.nonzero(assignments)
     angles = np.array([np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
     uu, vv = angles * distances[aa, yy, xx]
-    colors = hsv((centroids[aa] + np.pi) / 2 / np.pi)
+    colors = angle_to_rgb(centroids[aa], with_alpha=True)#hsv((centroids[aa] + np.pi) / 2 / np.pi)
     colors[:, 3] = assignments[aa, yy, xx] * 0.5
     ax.imshow(get_colored_difference_image(moving, static))
     ax.quiver(xx, yy, -vv, uu, angles='xy', scale_units='xy', scale=1,
