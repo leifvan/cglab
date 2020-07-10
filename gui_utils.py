@@ -39,11 +39,11 @@ class RunResult:
 
 
 class StreamlitProgressWrapper:
-    def __init__(self, total):
+    def __init__(self, total, parent=st):
         self.total = total
         self.n = 0
-        self.label = st.text(body=f"0 / {total}")
-        self.pbar = st.progress(0.)
+        self.label = parent.text(body=f"0 / {total}")
+        self.pbar = parent.progress(0.)
         self.postfix = ""
 
     def _update_label(self):

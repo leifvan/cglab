@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 import pickle
 import random
-import attr
 import os
 import string
 import time
@@ -26,7 +25,6 @@ from methods import estimate_transform_from_binary_correspondences, estimate_tra
     apply_transform
 from displacement import plot_correspondences
 
-# load previous configs
 configs, config_paths = load_previous_configs()
 
 
@@ -68,12 +66,11 @@ measured as the MAE between the images. The number below determines which of the
 pick. The similarity decreases with higher values.
 '''
 
-patch_position = st.number_input(label='patch number', min_value=1, max_value=1000, value=250)
+patch_position = st.sidebar.number_input(label='patch number', min_value=1, max_value=1000, value=250)
 
 
 @st.cache(show_spinner=False)
 def get_patch_pairs():
-    print("PATCH PAIRS!")
     patch_size = 80
     return find_promising_patch_pairs(feature_map, patch_size=patch_size, stride=16, num_pairs=1000)
 
@@ -126,14 +123,14 @@ st.image(image=plot_moving_static_diff(), use_column_width=True)
 Now we are looking for the main directions of gradients in the image. For each main direction we also
 need an interval s.t. every angle in that interval is assigned to the main direction.
 '''
-centroid_method = st.radio(label="centroids method", options=("equidistant",
+centroid_method = st.sidebar.radio(label="centroids method", options=("equidistant",
                                                               "histogram clustering"))
 num_centroids = kde_rho = None
 if centroid_method == "equidistant":
     '''
     Here we simply choose $n$ equidistant directions and intervals.
     '''
-    num_centroids = st.number_input(label="number of angles", min_value=2, max_value=32, value=8)
+    num_centroids = st.sidebar.number_input(label="number of angles", min_value=2, max_value=32, value=8)
 elif centroid_method == 'histogram clustering':
     r'''
     Use a direct kernel density estimation on the angles and take the maxima of the resulting
@@ -148,7 +145,7 @@ elif centroid_method == 'histogram clustering':
     $$
     $\rho\in (0,1)$ is the smoothness parameter, where higher values lead to a less-smoothed estimate.
     '''
-    kde_rho = st.slider(label='rho', min_value=0., max_value=1., value=0.8)
+    kde_rho = st.sidebar.slider(label='rho', min_value=0., max_value=1., value=0.8)
 
 
 @st.cache
@@ -270,7 +267,7 @@ def get_moving_assignments_memberships():
 
 moving_assignments, moving_memberships = get_moving_assignments_memberships()
 
-assignment_type = st.radio('assignment type', options=("binary", "memberships"))
+assignment_type = st.sidebar.radio('assignment type', options=("binary", "memberships"))
 
 
 @st.cache(allow_output_mutation=True)
@@ -303,7 +300,7 @@ st.image(image=plot_memberships())
 Based on the directions, we can now fit a transformation.
 '''
 
-transform_type = st.radio(label='transform type', options=("linear transform",
+transform_type = st.sidebar.radio(label='transform type', options=("linear transform",
                                                            "dense displacement"))
 smoothness = None
 if transform_type == "linear transform":
@@ -362,9 +359,9 @@ if transform_type == "linear transform":
     '''
 
 elif transform_type == 'dense displacement':
-    smoothness = st.slider('warp field smoothness', min_value=0, max_value=10000, value=2000)
+    smoothness = st.sidebar.slider('warp field smoothness', min_value=0, max_value=10000, value=2000, step=100)
 
-num_iterations = st.number_input('number of iterations', min_value=1, max_value=100, value=20)
+num_iterations = st.sidebar.number_input('number of iterations', min_value=1, max_value=200, value=20)
 
 '''
 ### Results
@@ -422,9 +419,11 @@ def load_config_and_show():
 
 
 if config in configs:
+    st.sidebar.text("Calculation done.")
     load_config_and_show()
 
-elif st.button("Run calculation with above settings"):
+elif st.sidebar.button("Run calculation"):
+
     pbar = StreamlitProgressWrapper(total=num_iterations)
 
     # run calculation
@@ -480,3 +479,5 @@ elif st.button("Run calculation with above settings"):
         #                                                             smoothness, pbar)
 
         load_config_and_show()
+else:
+    st.info("Click 'Run calculation' in the sidebar to get results.")
