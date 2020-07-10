@@ -58,7 +58,7 @@ def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter, pro
 
         if progress_bar:
             progress_bar.update(1)
-            progress_bar.set_postfix(dict(error=result.error))
+            progress_bar.set_postfix(dict(error=result.error, energy=result.energy))
 
     return results
 
@@ -150,12 +150,12 @@ def estimate_transform_by_minimizing_energy(moving, static, n_iter, centroids, i
         sx, sy, rot, shear, tx, ty = x
         transform = AffineTransform(scale=(1 + sx, 1 + sy), rotation=rot, shear=shear, translation=(tx, ty))
         warped = apply_transform(moving, transform)
-        results.append(TransformResult(transform, error=_get_error(warped, static),
-                                       energy=energy))
+        error = _get_error(warped, static)
+        results.append(TransformResult(transform, error=error, energy=energy))
 
         if progress_bar:
             progress_bar.update(1)
-            progress_bar.set_postfix(dict(energy=energy))
+            progress_bar.set_postfix(dict(energy=energy, error=error))
 
         scipy.optimize.basinhopping(opt_wrapper, x0=np.zeros(6), stepsize=1e-6, niter=n_iter, callback=callback)
 

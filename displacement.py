@@ -47,7 +47,7 @@ def plot_correspondences(moving, static, centroids, assignments, distances, dire
     aa, yy, xx = np.nonzero(assignments)
     angles = np.array([np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
     uu, vv = angles * distances[aa, yy, xx]
-    colors = angle_to_rgb(centroids[aa], with_alpha=True)#hsv((centroids[aa] + np.pi) / 2 / np.pi)
+    colors = angle_to_rgb(centroids[aa], with_alpha=True)  # hsv((centroids[aa] + np.pi) / 2 / np.pi)
     colors[:, 3] = assignments[aa, yy, xx] * 0.5
     ax.imshow(get_colored_difference_image(moving, static))
     ax.quiver(xx, yy, -vv, uu, angles='xy', scale_units='xy', scale=1,
@@ -79,21 +79,18 @@ def estimate_projective_transform(src, dst, weights=None):
     a[:n, 2] = 1
     a[:n, 6] = -src[:, 0] * dst[:, 0]
     a[:n, 7] = -src[:, 1] * dst[:, 0]
-    a[:n] *= sqrt_weights[...,None]
+    a[:n] *= sqrt_weights[..., None]
 
     a[n:, 3] = src[:, 0]
     a[n:, 4] = src[:, 1]
     a[n:, 5] = 1
     a[n:, 6] = -src[:, 0] * dst[:, 1]
     a[n:, 7] = -src[:, 1] * dst[:, 1]
-    a[n:] *= sqrt_weights[...,None]
+    a[n:] *= sqrt_weights[..., None]
 
-    #lamb = 1
-    #x = np.linalg.inv(a.T @ a + (lamb ** 2) * np.eye(6)) @ a.T @ b
-
+    # damp is the lambda of Tikhonov regularization
     x = lsmr(a, b, damp=0)[0]
-    # x, residuals, rank, s = np.linalg.lstsq(a, b, rcond=None)
-    # x2 = np.linalg.lstsq(a,b)[0]
+
     mat = np.array([*x, 1]).reshape((3, 3))
     mat_transformed = np.linalg.inv(dst_matrix) @ mat @ src_matrix
     return ProjectiveTransform(matrix=mat_transformed)
