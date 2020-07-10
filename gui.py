@@ -12,6 +12,9 @@ import string
 import time
 from functools import partial
 
+from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RESULTS_SUFFIX, \
+    RUNS_DIRECTORY, RunResult, StreamlitProgressWrapper
+
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
@@ -23,80 +26,8 @@ from methods import estimate_transform_from_binary_correspondences, estimate_tra
     apply_transform
 from displacement import plot_correspondences
 
-
-@attr.s(frozen=True)
-class RunConfiguration:
-    # TODO also save feature map (path)
-    patch_position: int = attr.ib(default=None)
-    centroid_method: str = attr.ib(default=None)
-    num_centroids: int = attr.ib(default=None)
-    kde_rho: float = attr.ib(default=None)
-    assignment_type: str = attr.ib(default=None)
-    transform_type: str = attr.ib(default=None)
-    smoothness: int = attr.ib(default=None)
-    num_iterations: int = attr.ib(default=None)
-
-    def fulfills(self, proto_config):
-        attr_names = attr.fields_dict(RunConfiguration)
-        reduced_self = RunConfiguration(**{n: getattr(self, n) for n in attr_names
-                                           if getattr(proto_config, n) is not None})
-        return reduced_self == proto_config
-
-
-@attr.s
-class RunResult:
-    moving: np.ndarray = attr.ib()
-    static: np.ndarray = attr.ib()
-
-    centroids: np.ndarray = attr.ib()
-    intervals: np.ndarray = attr.ib()
-
-    results: list = attr.ib()
-    warped_moving: list = attr.ib()
-
-
-class StreamlitProgressWrapper:
-    def __init__(self, total):
-        self.total = total
-        self.n = 0
-        self.label = st.text(body=f"0 / {total}")
-        self.pbar = st.progress(0.)
-        self.postfix = ""
-
-    def _update_label(self):
-        self.label.text(f"{self.n} / {self.total} | {self.postfix}")
-
-    def update(self, delta):
-        self.n += delta
-        self._update_label()
-        if self.n <= self.total:
-            self.pbar.progress(self.n / self.total)
-        else:
-            print("Warning: progress bar >100%")
-
-    def set_postfix(self, postfix):
-        self.postfix = postfix
-        self._update_label()
-
-
-RUNS_DIRECTORY = "data/runs"
-CONFIG_SUFFIX = ".config"
-RESULTS_SUFFIX = ".results"
-
 # load previous configs
-configs = []
-config_paths = [p for p in os.listdir(RUNS_DIRECTORY) if p.endswith(CONFIG_SUFFIX)]
-for fp in config_paths:
-    with open(os.path.join(RUNS_DIRECTORY, fp), 'rb') as config_file:
-        configs.append(pickle.load(config_file))
-
-
-def figure_to_image():
-    canvas = plt.gcf().canvas
-    canvas.draw()
-    buf = canvas.buffer_rgba()
-    plt.close()
-    return np.asarray(buf)
+configs, config_paths = load_previous_configs()
 
 
 @st.cache
