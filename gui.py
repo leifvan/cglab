@@ -11,6 +11,8 @@ import string
 import time
 from functools import partial
 
+from matplotlib.ticker import MaxNLocator
+
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RESULTS_SUFFIX, \
     RUNS_DIRECTORY, RunResult, StreamlitProgressWrapper
 
@@ -66,7 +68,10 @@ measured as the MAE between the images. The number below determines which of the
 pick. The similarity decreases with higher values.
 '''
 
-patch_position = st.sidebar.number_input(label='patch number', min_value=1, max_value=1000, value=250)
+patch_position = st.sidebar.number_input(label='index of the patch pair to choose',
+                                         min_value=1, max_value=1000, value=250)
+
+st.sidebar.markdown('---')
 
 
 @st.cache(show_spinner=False)
@@ -123,14 +128,18 @@ st.image(image=plot_moving_static_diff(), use_column_width=True)
 Now we are looking for the main directions of gradients in the image. For each main direction we also
 need an interval s.t. every angle in that interval is assigned to the main direction.
 '''
-centroid_method = st.sidebar.radio(label="centroids method", options=("equidistant",
-                                                              "histogram clustering"))
+
+centroid_method = st.sidebar.radio(label="how to determine main gradient directions",
+                                   options=("equidistant", "histogram clustering"))
 num_centroids = kde_rho = None
+
 if centroid_method == "equidistant":
     '''
     Here we simply choose $n$ equidistant directions and intervals.
     '''
-    num_centroids = st.sidebar.number_input(label="number of angles", min_value=2, max_value=32, value=8)
+    num_centroids = st.sidebar.number_input(label="number of equidistant angles",
+                                            min_value=2, max_value=32, value=8)
+
 elif centroid_method == 'histogram clustering':
     r'''
     Use a direct kernel density estimation on the angles and take the maxima of the resulting
@@ -145,8 +154,11 @@ elif centroid_method == 'histogram clustering':
     $$
     $\rho\in (0,1)$ is the smoothness parameter, where higher values lead to a less-smoothed estimate.
     '''
-    kde_rho = st.sidebar.slider(label='rho', min_value=0., max_value=1., value=0.8)
+    kde_rho = st.sidebar.slider(label='rho-value for the KDE',
+                                min_value=0., max_value=1., value=0.8)
 
+
+st.sidebar.markdown('---')
 
 @st.cache
 def get_centroids_intervals():
@@ -247,16 +259,6 @@ def plot_assignments():
 
 st.image(image=plot_assignments(), use_column_width=True)
 
-'''
-### Memberships
-AKA softassignments.
-'''
-
-picked_angle = st.selectbox(label='angle', options=centroids_degrees)
-picked_angle_index = centroids_degrees.index(picked_angle)
-
-write_centroid_legend()
-
 
 @st.cache(allow_output_mutation=True)
 def get_moving_assignments_memberships():
@@ -266,8 +268,6 @@ def get_moving_assignments_memberships():
 
 
 moving_assignments, moving_memberships = get_moving_assignments_memberships()
-
-assignment_type = st.sidebar.radio('assignment type', options=("binary", "memberships"))
 
 
 @st.cache(allow_output_mutation=True)
@@ -281,54 +281,122 @@ def get_static_assignments_distances_directions():
 static_assignments, static_distances, static_directions = get_static_assignments_distances_directions()
 
 
-@st.cache(allow_output_mutation=True)
-def plot_memberships():
-    plt.figure()
-    color = centroids_colors[picked_angle_index]
-    membership_image = np.tile(moving[..., None], reps=(1, 1, 3)) * 0.2
-    membership_image += 0.8 * moving_memberships[picked_angle_index, ..., None] * color
-    plt.imshow(membership_image)
-    return figure_to_image()
+assignment_type = st.sidebar.radio('assignment type', options=("binary", "memberships"))
 
+if assignment_type == 'memberships':
 
-st.image(image=plot_memberships())
-
-# TODO plot assignments
-
-'''
-### Type of transform
-Based on the directions, we can now fit a transformation.
-'''
-
-transform_type = st.sidebar.radio(label='transform type', options=("linear transform",
-                                                           "dense displacement"))
-smoothness = None
-if transform_type == "linear transform":
     r'''
-    Fit a *projective transformation* based on the following correspondences. The correspondences
-    are determined using the distance transformations of the binary map of each main angle. More
-    specifically, for a main direction $\phi$ and its interval $[a, b]$, we get two binary images
-    $M_\phi[i,j]$ and $S_\phi[i,j]$ indicating the pixels with a gradient angle in $[a,b]$
-    for the moving and the static image, respectively. For every pixel $(i,j)$ where $M_\phi[i,j] = 1$
-    we can find a closest pixel $(i',j')$ with $S_\phi[i',j'] = 1$. These pairs are the
-    correspondences.
+    ### Memberships
+    Instead of using binary assignments in the moving image, we will use soft-assignments for each
+    (pixel, angle) pair. Let $M_{\phi_k}[i,j]$ be the membership of pixel (i,j) to the k-th main
+    direction $\phi_k$. The membership is a value in [0,1] and is determined as a linear
+    interpolation where $M_\phi[i,j]$ is 0 if the angle $\psi$ at pixel (i,j) is outside the
+    interval $(\phi_{k-1}, \phi_{k+1})$ and 1 if $\psi = \phi_k$. These values are shown in the
+    following plot:
     
-    Below all correspondences are drawn as arrows from pixel $(i,j)$ in $M$ to the pixel $(i',j')$
-    in $S$. The coloring denotes from which main direction $\phi$ the correspondence originates.
     '''
+
+    @st.cache
+    def plot_membership_calculation():
+        plt.figure(figsize=(7, 3))
+        centroids_degree_values = -(centroids / np.pi * 180 + 180) % 360
+        sort_idx = np.argsort(centroids_degree_values)
+        centroids_degree_values = centroids_degree_values[sort_idx]
+
+        for i, color in enumerate(centroids_colors[sort_idx]):
+            if i == 0:
+                plt.plot(centroids_degree_values[:2], [1, 0], c=color)
+                plt.fill_between(centroids_degree_values[:2], [1, 0], color=color, alpha=0.05)
+            elif i == len(centroids_colors) - 1:
+                plt.plot([centroids_degree_values[i-1],
+                          centroids_degree_values[i],
+                          centroids_degree_values[0]+360], [0, 1, 0], c=color)
+                plt.fill_between([centroids_degree_values[i-1],
+                                  centroids_degree_values[i],
+                                  centroids_degree_values[0]+360], [0, 1, 0],
+                                 color=color, alpha=0.05)
+            else:
+                plt.plot(centroids_degree_values[i-1:i+2], [0,1,0], c=color)
+                plt.fill_between(centroids_degree_values[i-1:i+2], [0,1,0], color=color, alpha=0.05)
+
+        plt.plot([centroids_degree_values[-1], centroids_degree_values[0]+360], [0, 1],
+                 c=centroids_colors[sort_idx[0]])
+        plt.fill_between([centroids_degree_values[-1], centroids_degree_values[0]+360], [0, 1],
+                         color=centroids_colors[sort_idx[0]], alpha=0.05)
+        plt.xticks([*centroids_degree_values,centroids_degree_values[0]+360],
+                   [f"{cdv:.0f}°" for cdv in [*centroids_degree_values,centroids_degree_values[0]+360]])
+        plt.xlabel("angle")
+        plt.ylabel("membership")
+        plt.tight_layout()
+        return figure_to_image()
+
+    st.image(image=plot_membership_calculation())
+
+    '''
+    This gives the following memberships for each pixel of the moving image:
+    '''
+
+    picked_angle = st.selectbox(label='angle', options=centroids_degrees)
+    picked_angle_index = centroids_degrees.index(picked_angle)
 
     write_centroid_legend()
 
 
     @st.cache(allow_output_mutation=True)
-    def plot_binary_correspondences():
+    def plot_memberships():
         plt.figure()
-        plot_correspondences(moving, static, centroids, moving_assignments, static_distances, static_directions)
-        plt.tight_layout()
+        color = centroids_colors[picked_angle_index]
+        membership_image = np.tile(moving[..., None], reps=(1, 1, 3)) * 0.2
+        membership_image += 0.8 * moving_memberships[picked_angle_index, ..., None] * color
+        plt.imshow(membership_image)
         return figure_to_image()
 
 
-    st.image(plot_binary_correspondences())
+    st.image(image=plot_memberships())
+
+# TODO plot assignments
+
+'''
+### Type of transform
+'''
+
+transform_type = st.sidebar.radio(label='transform type', options=("linear transform",
+                                                                   "dense displacement"))
+transform_type_to_name = {'linear transform': 'projective transformation',
+                          'dense displacement': 'dense displacement map'}
+
+f'''
+We can now fit a *{transform_type_to_name[transform_type]}*.
+'''
+
+r'''
+The transform will be fitted based on the following correspondences. The correspondences
+are determined using the distance transformations of the binary map of each main angle.
+More specifically, for a main direction $\phi$ and its interval $[a, b]$, we get two
+binary images $M_\phi$ and $S_\phi$ indicating the pixels with a gradient
+angle in $[a,b]$ for the moving and the static image, respectively. For every pixel
+$(i,j)$ where $M_\phi[i,j] = 1$ we can find a closest pixel $(i',j')$ with
+$S_\phi[i',j'] = 1$. These pairs are the correspondences.
+
+Below all correspondences are drawn as arrows from pixel $(i,j)$ in $M$ to the pixel
+$(i',j')$ in $S$. The coloring denotes from which main direction $\phi$ the
+correspondence originates.
+'''
+
+write_centroid_legend()
+
+@st.cache(allow_output_mutation=True)
+def plot_binary_correspondences():
+    plt.figure()
+    plot_correspondences(moving, static, centroids, moving_assignments, static_distances, static_directions)
+    plt.tight_layout()
+    return figure_to_image()
+
+
+st.image(plot_binary_correspondences())
+
+smoothness = None
+if transform_type == "linear transform":
 
     r'''
     The projective transform
@@ -412,7 +480,9 @@ def load_config_and_show():
     def plot_error():
         plt.figure()
         plt.plot([r.energy for r in run_result.results])
-        plt.title("energy")
+        plt.xlabel("iteration")
+        plt.ylabel("energy")
+        plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
         return figure_to_image()
 
     st.image(image=plot_error())
