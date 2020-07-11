@@ -10,6 +10,8 @@ import os
 import string
 import time
 from functools import partial
+import pandas as pd
+import attr
 
 from matplotlib.ticker import MaxNLocator
 
@@ -27,7 +29,7 @@ from methods import estimate_transform_from_binary_correspondences, estimate_tra
     apply_transform
 from displacement import plot_correspondences
 
-configs, config_paths = load_previous_configs()
+configs = load_previous_configs()
 
 
 @st.cache
@@ -138,7 +140,7 @@ if centroid_method == "equidistant":
     Here we simply choose $n$ equidistant directions and intervals.
     '''
     num_centroids = st.sidebar.number_input(label="number of equidistant angles",
-                                            min_value=2, max_value=32, value=8)
+                                            min_value=1, max_value=32, value=8)
 
 elif centroid_method == 'histogram clustering':
     r'''
@@ -435,16 +437,19 @@ num_iterations = st.sidebar.number_input('number of iterations', min_value=1, ma
 ### Results
 '''
 
-config = RunConfiguration(patch_position=patch_position, centroid_method=centroid_method,
+random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
+config = RunConfiguration(file_path=os.path.join(RUNS_DIRECTORY, random_name + CONFIG_SUFFIX),
+                          patch_position=patch_position, centroid_method=centroid_method,
                           num_centroids=num_centroids, kde_rho=kde_rho,
                           assignment_type=assignment_type, transform_type=transform_type,
                           smoothness=smoothness, num_iterations=num_iterations)
 
 
 def load_config_and_show():
-    config_path = config_paths[configs.index(config)].replace(CONFIG_SUFFIX, RESULTS_SUFFIX)
-    with open(os.path.join(RUNS_DIRECTORY, config_path), 'rb') as results_file:
-        run_result: RunResult = pickle.load(results_file)
+    run_result = config.load_results()
+    # config_path = config_paths[configs.index(config)].replace(CONFIG_SUFFIX, RESULTS_SUFFIX)
+    # with open(os.path.join(RUNS_DIRECTORY, config_path), 'rb') as results_file:
+    #     run_result: RunResult = pickle.load(results_file)
 
     result_index_placeholder = st.empty()
     result_index = result_index_placeholder.slider(label="Pick frame", min_value=0,
@@ -477,18 +482,35 @@ def load_config_and_show():
 
     result_diff_placeholder.image(image=show_result(result_index), use_column_width=True)
 
-    def plot_error():
-        plt.figure()
-        plt.plot([r.energy for r in run_result.results])
-        plt.xlabel("iteration")
-        plt.ylabel("energy")
-        plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
-        return figure_to_image()
+    similar_configs = [c for c in configs if c.is_similar_to(config)]
+    similar_results = [c.load_results() for c in similar_configs]
 
-    st.image(image=plot_error())
+    # if len(similar_configs) > 0:
+    df = pd.DataFrame([attr.asdict(c) for c in similar_configs])
+    df = df.drop(columns=['file_path', 'patch_position'])
+    st.dataframe(df)
+    # if len(similar_configs) > 0:
+    #     if st.checkbox(f"Show {len(similar_configs)} other configs run on the same patch pair"):
+    #         config_checkboxes = [st.checkbox(str(c)) for c in similar_configs]
+
+    # def plot_error():
+    #     plt.figure()
+    #     plt.plot([r.energy for r in run_result.results])
+    #     plt.xlabel("iteration")
+    #     plt.ylabel("energy")
+    #     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
+    #     return figure_to_image()
+    #
+    # st.image(image=plot_error())
+
+    # energy_df = pd.DataFrame({'energy': [r.energy for r in run_result.results]})
+    all_energy_df = pd.DataFrame({i: [r.energy for r in rr.results]
+                                  for i, rr in enumerate(similar_results)})
+    st.line_chart(all_energy_df)
 
 
 if config in configs:
+    config = configs[configs.index(config)]
     st.sidebar.text("Calculation done.")
     load_config_and_show()
 
@@ -526,27 +548,13 @@ elif st.sidebar.button("Run calculation"):
     if results is None:
         st.error("Failed to run config!")
     else:
-        random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
-        with open(os.path.join(RUNS_DIRECTORY, random_name + CONFIG_SUFFIX), 'wb') as config_file:
-            pickle.dump(config, config_file)
+        config.save()
 
         result_obj = RunResult(moving=moving.copy(), static=static.copy(), centroids=centroids.copy(),
                                intervals=intervals.copy(), results=results,
                                warped_moving=[apply_transform(moving, r.stacked_transform) for r in results])
-        with open(os.path.join(RUNS_DIRECTORY, random_name + RESULTS_SUFFIX), 'wb') as results_file:
-            pickle.dump(result_obj, results_file)
-
-        config_paths.append(random_name + CONFIG_SUFFIX)
+        config.save_results(result_obj)
         configs.append(config)
-
-        # if transform_type == 'linear transform':
-        #     results = estimate_transform_from_correspondences(moving, static, num_iterations, centroids,
-        #                                                       intervals, pbar)
-        # elif transform_type == 'dense displacement':
-        #     # TODO binary/membership radio does not do anything yet
-        #     results = estimate_dense_displacements_from_memberships(moving, static, num_iterations,
-        #                                                             centroids, intervals,
-        #                                                             smoothness, pbar)
 
         load_config_and_show()
 else:

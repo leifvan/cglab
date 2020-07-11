@@ -9,7 +9,10 @@ import streamlit as st
 
 @attr.s(frozen=True)
 class RunConfiguration:
+    _similarity_params = ('patch_position',)
+
     # TODO also save feature map (path)
+    file_path: str = attr.ib(default=None, eq=False)
     patch_position: int = attr.ib(default=None)
     centroid_method: str = attr.ib(default=None)
     num_centroids: int = attr.ib(default=None)
@@ -19,11 +22,47 @@ class RunConfiguration:
     smoothness: int = attr.ib(default=None)
     num_iterations: int = attr.ib(default=None)
 
-    def fulfills(self, proto_config):
+    def fulfills(self, proto_config: 'RunConfiguration'):
         attr_names = attr.fields_dict(RunConfiguration)
         reduced_self = RunConfiguration(**{n: getattr(self, n) for n in attr_names
                                            if getattr(proto_config, n) is not None})
         return reduced_self == proto_config
+
+    def is_similar_to(self, other_config: 'RunConfiguration'):
+        return all(getattr(self, sp) == getattr(other_config, sp) for sp in self._similarity_params)
+
+    @classmethod
+    def load(cls, path):
+        with open(path, 'rb') as config_file:
+            return pickle.load(config_file)
+
+    def save(self):
+        with open(self.file_path, 'wb') as config_file:
+            pickle.dump(self, config_file)
+
+    def load_results(self):
+        with open(self.file_path.replace(CONFIG_SUFFIX, RESULTS_SUFFIX), 'rb') as results_file:
+            return pickle.load(results_file)
+
+    def save_results(self, results):
+        with open(self.file_path.replace(CONFIG_SUFFIX, RESULTS_SUFFIX), 'wb') as results_file:
+            pickle.dump(results, results_file)
+
+    def __str__(self):
+        descs = []
+        if self.centroid_method == 'equidistant':
+            descs.append(f"for {self.num_centroids} equidistant main directions,")
+        else:
+            descs.append(f"for KDE-estimated angles with rho={self.kde_rho},")
+
+        descs.append(f"fit a {self.transform_type}")
+
+        if self.smoothness:
+            descs.append(f"with smoothness={self.smoothness}")
+
+        descs.append(f"using {self.assignment_type} for {self.num_iterations} iterations.")
+
+        return ' '.join(descs)
 
 
 @attr.s
@@ -75,9 +114,5 @@ RESULTS_SUFFIX = ".results"
 
 
 def load_previous_configs():
-    configs = []
     config_paths = [p for p in os.listdir(RUNS_DIRECTORY) if p.endswith(CONFIG_SUFFIX)]
-    for fp in config_paths:
-        with open(os.path.join(RUNS_DIRECTORY, fp), 'rb') as config_file:
-            configs.append(pickle.load(config_file))
-    return configs, config_paths
+    return [RunConfiguration.load(os.path.join(RUNS_DIRECTORY, p)) for p in config_paths]
