@@ -5,7 +5,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import attr
 import streamlit as st
+from typing import List
 
+from methods import TransformResult
+
+
+@attr.s
+class RunResult:
+    moving: np.ndarray = attr.ib()
+    static: np.ndarray = attr.ib()
+
+    centroids: np.ndarray = attr.ib()
+    intervals: np.ndarray = attr.ib()
+
+    results: List[TransformResult] = attr.ib()
+    warped_moving: list = attr.ib()
 
 @attr.s(frozen=True)
 class RunConfiguration:
@@ -40,7 +54,7 @@ class RunConfiguration:
         with open(self.file_path, 'wb') as config_file:
             pickle.dump(self, config_file)
 
-    def load_results(self):
+    def load_results(self) -> RunResult:
         with open(self.file_path.replace(CONFIG_SUFFIX, RESULTS_SUFFIX), 'rb') as results_file:
             return pickle.load(results_file)
 
@@ -65,16 +79,7 @@ class RunConfiguration:
         return ' '.join(descs)
 
 
-@attr.s
-class RunResult:
-    moving: np.ndarray = attr.ib()
-    static: np.ndarray = attr.ib()
 
-    centroids: np.ndarray = attr.ib()
-    intervals: np.ndarray = attr.ib()
-
-    results: list = attr.ib()
-    warped_moving: list = attr.ib()
 
 
 class StreamlitProgressWrapper:

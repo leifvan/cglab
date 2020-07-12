@@ -93,6 +93,7 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
     static_distances = get_distance_transforms_from_binary_assignments(static_assignments)
     static_directions = get_closest_feature_directions_from_binary_assignments(static_assignments)
 
+    # TODO estimate reverse transform to prevent holes
     def estimate_fn(moving, static, previous_transform):
         if previous_transform is None:
             previous_transform = np.mgrid[:moving.shape[0], :moving.shape[1]]

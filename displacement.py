@@ -19,7 +19,7 @@ import numpy as np
 import scipy.interpolate
 import matplotlib.pyplot as plt
 from utils import get_colored_difference_image, angle_to_rgb
-from skimage.transform import ProjectiveTransform
+from skimage.transform import ProjectiveTransform, warp
 from skimage.transform._geometric import _center_and_normalize_points
 from scipy.sparse.linalg import lsmr
 
@@ -154,6 +154,15 @@ def estimate_projective_transform(src, dst, weights=None):
     mat_transformed = np.linalg.inv(dst_matrix) @ mat @ src_matrix
     return ProjectiveTransform(matrix=mat_transformed)
 
+
+def plot_projective_transform(transform, ax=None):
+    if ax is None:
+        ax = plt.gca()
+
+    unwarped = np.zeros((200, 200))
+    unwarped[50:150, 50:150] = 1
+    warped = warp(unwarped, transform)
+    ax.imshow(0.8*warped-0.2*unwarped, cmap='bone_r', vmin=0, vmax=1)
 
 def estimate_transform_from_memberships(memberships, distances, directions):
     """

@@ -12,6 +12,7 @@ import time
 from functools import partial
 import pandas as pd
 import attr
+import altair as alt
 
 from matplotlib.ticker import MaxNLocator
 
@@ -27,7 +28,7 @@ from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice
 from methods import estimate_transform_from_binary_correspondences, estimate_transform_from_soft_correspondences, \
     estimate_dense_displacements_from_memberships, estimate_dense_displacements_from_binary_assignments, \
     apply_transform
-from displacement import plot_correspondences
+from displacement import plot_correspondences, get_energy, plot_projective_transform
 
 configs = load_previous_configs()
 
@@ -159,8 +160,8 @@ elif centroid_method == 'histogram clustering':
     kde_rho = st.sidebar.slider(label='rho-value for the KDE',
                                 min_value=0., max_value=1., value=0.8)
 
-
 st.sidebar.markdown('---')
+
 
 @st.cache
 def get_centroids_intervals():
@@ -282,7 +283,6 @@ def get_static_assignments_distances_directions():
 
 static_assignments, static_distances, static_directions = get_static_assignments_distances_directions()
 
-
 assignment_type = st.sidebar.radio('assignment type', options=("binary", "memberships"))
 
 if assignment_type == 'memberships':
@@ -298,6 +298,7 @@ if assignment_type == 'memberships':
     
     '''
 
+
     @st.cache
     def plot_membership_calculation():
         plt.figure(figsize=(7, 3))
@@ -310,27 +311,28 @@ if assignment_type == 'memberships':
                 plt.plot(centroids_degree_values[:2], [1, 0], c=color)
                 plt.fill_between(centroids_degree_values[:2], [1, 0], color=color, alpha=0.05)
             elif i == len(centroids_colors) - 1:
-                plt.plot([centroids_degree_values[i-1],
+                plt.plot([centroids_degree_values[i - 1],
                           centroids_degree_values[i],
-                          centroids_degree_values[0]+360], [0, 1, 0], c=color)
-                plt.fill_between([centroids_degree_values[i-1],
+                          centroids_degree_values[0] + 360], [0, 1, 0], c=color)
+                plt.fill_between([centroids_degree_values[i - 1],
                                   centroids_degree_values[i],
-                                  centroids_degree_values[0]+360], [0, 1, 0],
+                                  centroids_degree_values[0] + 360], [0, 1, 0],
                                  color=color, alpha=0.05)
             else:
-                plt.plot(centroids_degree_values[i-1:i+2], [0,1,0], c=color)
-                plt.fill_between(centroids_degree_values[i-1:i+2], [0,1,0], color=color, alpha=0.05)
+                plt.plot(centroids_degree_values[i - 1:i + 2], [0, 1, 0], c=color)
+                plt.fill_between(centroids_degree_values[i - 1:i + 2], [0, 1, 0], color=color, alpha=0.05)
 
-        plt.plot([centroids_degree_values[-1], centroids_degree_values[0]+360], [0, 1],
+        plt.plot([centroids_degree_values[-1], centroids_degree_values[0] + 360], [0, 1],
                  c=centroids_colors[sort_idx[0]])
-        plt.fill_between([centroids_degree_values[-1], centroids_degree_values[0]+360], [0, 1],
+        plt.fill_between([centroids_degree_values[-1], centroids_degree_values[0] + 360], [0, 1],
                          color=centroids_colors[sort_idx[0]], alpha=0.05)
-        plt.xticks([*centroids_degree_values,centroids_degree_values[0]+360],
-                   [f"{cdv:.0f}°" for cdv in [*centroids_degree_values,centroids_degree_values[0]+360]])
+        plt.xticks([*centroids_degree_values, centroids_degree_values[0] + 360],
+                   [f"{cdv:.0f}°" for cdv in [*centroids_degree_values, centroids_degree_values[0] + 360]])
         plt.xlabel("angle")
         plt.ylabel("membership")
         plt.tight_layout()
         return figure_to_image()
+
 
     st.image(image=plot_membership_calculation())
 
@@ -359,7 +361,7 @@ if assignment_type == 'memberships':
 # TODO plot assignments
 
 '''
-### Type of transform
+### Fit a transformation
 '''
 
 transform_type = st.sidebar.radio(label='transform type', options=("linear transform",
@@ -385,12 +387,23 @@ $(i',j')$ in $S$. The coloring denotes from which main direction $\phi$ the
 correspondence originates.
 '''
 
+if assignment_type == 'memberships':
+    '''
+    The correspondences will be weighted by the membership values (see above). In the following
+    plot, the weights are depicted by the transparency of the arrows.
+    '''
+
 write_centroid_legend()
+
 
 @st.cache(allow_output_mutation=True)
 def plot_binary_correspondences():
     plt.figure()
-    plot_correspondences(moving, static, centroids, moving_assignments, static_distances, static_directions)
+    plot_correspondences(moving, static, centroids,
+                         moving_assignments if assignment_type == 'binary' else moving_memberships,
+                         static_distances, static_directions)
+    plt.title("correspondences from " +
+              ("binary assignments" if assignment_type == 'binary' else "memberships"))
     plt.tight_layout()
     return figure_to_image()
 
@@ -447,9 +460,6 @@ config = RunConfiguration(file_path=os.path.join(RUNS_DIRECTORY, random_name + C
 
 def load_config_and_show():
     run_result = config.load_results()
-    # config_path = config_paths[configs.index(config)].replace(CONFIG_SUFFIX, RESULTS_SUFFIX)
-    # with open(os.path.join(RUNS_DIRECTORY, config_path), 'rb') as results_file:
-    #     run_result: RunResult = pickle.load(results_file)
 
     result_index_placeholder = st.empty()
     result_index = result_index_placeholder.slider(label="Pick frame", min_value=0,
@@ -461,10 +471,25 @@ def load_config_and_show():
 
     @st.cache(allow_output_mutation=True)
     def show_result(i):
-        if i == 0:
-            plot_diff(moving, static)
-        else:
-            plot_diff(run_result.warped_moving[i - 1], static)
+        _, axs = plt.subplots(1, 3, figsize=(12, 5))
+
+        warped_moving = moving if i == 0 else run_result.warped_moving[i - 1]
+        axs[0].imshow(get_colored_difference_image(moving, static))
+
+        if i > 0:
+            if transform_type == 'linear transform':
+                plot_projective_transform(run_result.results[i-1].stacked_transform, ax=axs[1])
+            elif transform_type == 'dense displacement':
+                local_transform = run_result.results[i-1].stacked_transform - np.mgrid[:moving.shape[0], :moving.shape[1]]
+                plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[1])
+        axs[2].imshow(get_colored_difference_image(warped_moving, static))
+
+        # plot_diff(run_result.warped_moving[i - 1], static, axs[0])
+        # if transform_type == 'dense displacement':
+        #     local_transform = run_result.results[i].stacked_transform - np.mgrid[:moving.shape[0], :moving.shape[1]]
+        #     plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[1,0])
+
+        plt.tight_layout()
         return figure_to_image()
 
     result_diff_placeholder = st.empty()
@@ -485,28 +510,32 @@ def load_config_and_show():
     similar_configs = [c for c in configs if c.is_similar_to(config)]
     similar_results = [c.load_results() for c in similar_configs]
 
-    # if len(similar_configs) > 0:
-    df = pd.DataFrame([attr.asdict(c) for c in similar_configs])
-    df = df.drop(columns=['file_path', 'patch_position'])
-    st.dataframe(df)
-    # if len(similar_configs) > 0:
-    #     if st.checkbox(f"Show {len(similar_configs)} other configs run on the same patch pair"):
-    #         config_checkboxes = [st.checkbox(str(c)) for c in similar_configs]
+    '''
+    #### Energy
+    '''
+    initial_energy = get_energy(moving_memberships, static_distances)
 
-    # def plot_error():
-    #     plt.figure()
-    #     plt.plot([r.energy for r in run_result.results])
-    #     plt.xlabel("iteration")
-    #     plt.ylabel("energy")
-    #     plt.gca().xaxis.set_major_locator(MaxNLocator(integer=True))
-    #     return figure_to_image()
-    #
-    # st.image(image=plot_error())
-
-    # energy_df = pd.DataFrame({'energy': [r.energy for r in run_result.results]})
-    all_energy_df = pd.DataFrame({i: [r.energy for r in rr.results]
-                                  for i, rr in enumerate(similar_results)})
-    st.line_chart(all_energy_df)
+    if len(similar_configs) > 0 and st.checkbox(f'Show energy for {len(similar_configs)} similar configs'):
+        df = pd.DataFrame([attr.asdict(c) for c in similar_configs])
+        df = df.drop(columns=['file_path', 'patch_position'])
+        st.dataframe(df)
+        energies = [[initial_energy] + [r.energy for r in rr.results] for rr in similar_results]
+        all_energy = np.concatenate([[[i, j, e] for j, e in enumerate(energy)]
+                                     for i, energy in enumerate(energies)],
+                                    axis=0)
+        all_energy_df = pd.DataFrame(all_energy, columns=['id', 'x', 'energy']).join(df, on='id')
+        # st.dataframe(all_energy_df)
+        alt_chart = alt.Chart(all_energy_df) \
+            .mark_line(point=True) \
+            .encode(x='x:Q', y='energy:Q', color='id:N',
+                    tooltip=['id'] + list(df.columns)).interactive()
+        st.altair_chart(alt_chart, use_container_width=True)
+    else:
+        energy_df = pd.DataFrame({
+            'iteration': list(range(len(run_result.results))),
+            'energy': [r.energy for r in run_result.results]})
+        altair_chart = alt.Chart(energy_df).mark_line().encode(x='iteration', y='energy', )
+        st.altair_chart(altair_chart, use_container_width=True)
 
 
 if config in configs:
