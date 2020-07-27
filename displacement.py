@@ -164,6 +164,7 @@ def plot_projective_transform(transform, ax=None):
     warped = warp(unwarped, transform)
     ax.imshow(0.8*warped-0.2*unwarped, cmap='bone_r', vmin=0, vmax=1)
 
+
 def estimate_transform_from_memberships(memberships, distances, directions):
     """
     Estimates a projective transform based on the correspondences inferred by the given arrays.
