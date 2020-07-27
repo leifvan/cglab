@@ -8,7 +8,7 @@ from distance_transform import get_binary_assignments_from_centroids, get_distan
 from gradient_directions import get_n_equidistant_angles_and_intervals
 from skimage.transform import AffineTransform
 import scipy.optimize
-
+from approximation import dense_displacement_to_dct, dct_to_dense_displacement
 
 
 @attr.s
@@ -113,7 +113,7 @@ estimate_transform_from_soft_correspondences = partial(estimate_linear_transform
 
 
 def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, smooth, assignments_fn,
-                                 progress_bar=None):
+                                 reduce_coeffs=None, progress_bar=None):
     """
     Estimates a dense warp field that minimizes error of correspondences between ``moving``
     and ``static`` by transforming ``moving``. The correspondences are induced by the given
@@ -128,6 +128,8 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
     :param assignments_fn: A function that determines the assignments of ``moving`` and ``static``.
         Should be one of the functions from :mod:`distance_transform`, e.g.
         :func:`distance_transform.get_binary_assignments_from_centroids`.
+    :param reduce_coeffs: If not ``None``, applies a DCT to the result, truncate the coefficients
+        to the given integer along both axes and transforms it back to a dense displacement.
     :param progress_bar: An optional progress_bar to report progress to.
     :return: A list of :class:`TransformResult` objects containing the results of each iteration.
     """
@@ -142,6 +144,11 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
         moving_memberships = assignments_fn(moving, centroids, intervals)
         warp_field = calculate_dense_displacements(moving_memberships, static_distances,
                                                    static_directions, smooth)
+
+        if reduce_coeffs:
+            dct = dense_displacement_to_dct(warp_field, reduce_coeffs)
+            warp_field = dct_to_dense_displacement(dct, warp_field.shape)
+
         return previous_transform + warp_field
 
     return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter, progress_bar)

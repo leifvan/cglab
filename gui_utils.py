@@ -34,6 +34,7 @@ class RunConfiguration:
     assignment_type: str = attr.ib(default=None)
     transform_type: str = attr.ib(default=None)
     smoothness: int = attr.ib(default=None)
+    num_dct_coeffs: int = attr.ib(default=None)
     num_iterations: int = attr.ib(default=None)
 
     def fulfills(self, proto_config: 'RunConfiguration'):

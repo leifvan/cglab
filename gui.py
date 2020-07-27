@@ -410,7 +410,7 @@ def plot_binary_correspondences():
 
 st.image(plot_binary_correspondences())
 
-smoothness = None
+smoothness = num_dct_coeffs = None
 if transform_type == "linear transform":
 
     r'''
@@ -442,7 +442,12 @@ if transform_type == "linear transform":
     '''
 
 elif transform_type == 'dense displacement':
-    smoothness = st.sidebar.slider('warp field smoothness', min_value=0, max_value=10000, value=2000, step=100)
+    smoothness = st.sidebar.slider('warp field smoothness', min_value=0, max_value=10000,
+                                   value=2000, step=100)
+    num_dct_coeffs = st.sidebar.slider('spectral coefficients', min_value=1,
+                                       max_value=moving.shape[0], value=moving.shape[0])
+    if num_dct_coeffs == moving.shape[0]:
+        num_dct_coeffs = None
 
 num_iterations = st.sidebar.number_input('number of iterations', min_value=1, max_value=200, value=20)
 
@@ -455,7 +460,8 @@ config = RunConfiguration(file_path=os.path.join(RUNS_DIRECTORY, random_name + C
                           patch_position=patch_position, centroid_method=centroid_method,
                           num_centroids=num_centroids, kde_rho=kde_rho,
                           assignment_type=assignment_type, transform_type=transform_type,
-                          smoothness=smoothness, num_iterations=num_iterations)
+                          smoothness=smoothness, num_dct_coeffs=num_dct_coeffs,
+                          num_iterations=num_iterations)
 
 
 def load_config_and_show():
@@ -483,11 +489,6 @@ def load_config_and_show():
                 local_transform = run_result.results[i-1].stacked_transform - np.mgrid[:moving.shape[0], :moving.shape[1]]
                 plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[1])
         axs[2].imshow(get_colored_difference_image(warped_moving, static))
-
-        # plot_diff(run_result.warped_moving[i - 1], static, axs[0])
-        # if transform_type == 'dense displacement':
-        #     local_transform = run_result.results[i].stacked_transform - np.mgrid[:moving.shape[0], :moving.shape[1]]
-        #     plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[1,0])
 
         plt.tight_layout()
         return figure_to_image()
@@ -562,11 +563,15 @@ elif st.sidebar.button("Run calculation"):
                                RunConfiguration(transform_type='dense displacement',
                                                 assignment_type='binary'):
                                    partial(estimate_dense_displacements_from_binary_assignments,
-                                           **common_params, smooth=smoothness),
+                                           **common_params,
+                                           smooth=smoothness,
+                                           reduce_coeffs=num_dct_coeffs),
                                RunConfiguration(transform_type='dense displacement',
                                                 assignment_type='memberships'):
                                    partial(estimate_dense_displacements_from_memberships,
-                                           **common_params, smooth=smoothness)}
+                                           **common_params,
+                                           smooth=smoothness,
+                                           reduce_coeffs=num_dct_coeffs)}
 
     # find the first fitting config from the map
     for proto_config, fn in config_to_method_fn_map.items():
