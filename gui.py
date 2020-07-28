@@ -1,35 +1,31 @@
-import streamlit as st
-import numpy as np
-import skimage.transform
-import imageio
-import matplotlib.pyplot as plt
-import matplotlib.colors
-import pickle
 import random
-#import os
 import string
 import time
 from functools import partial
-import pandas as pd
-import attr
+from pathlib import Path
+
 import altair as alt
+import attr
+import imageio
+import matplotlib.colors
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import skimage.transform
+import streamlit as st
 
-from matplotlib.ticker import MaxNLocator
-
-from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RESULTS_SUFFIX, \
-    RUNS_DIRECTORY, RunResult, StreamlitProgressWrapper, PartialRunConfiguration
-
-from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
-    plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
+from displacement import plot_correspondences, get_energy, plot_projective_transform
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids
-from patches import find_promising_patch_pairs
-from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
+from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
+    plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
+from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
+    RunResult, StreamlitProgressWrapper, PartialRunConfiguration
 from methods import estimate_transform_from_binary_correspondences, estimate_transform_from_soft_correspondences, \
     estimate_dense_displacements_from_memberships, estimate_dense_displacements_from_binary_assignments, \
     apply_transform
-from displacement import plot_correspondences, get_energy, plot_projective_transform
-from pathlib import Path
+from patches import find_promising_patch_pairs
+from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
 
 # constants
 FEATURE_MAP_DIR = Path("data/feature_maps")
@@ -54,13 +50,13 @@ SMOOTHNESS_STEP = 100
 configs = load_previous_configs()
 params = PartialRunConfiguration()
 
-
 '''
 # Contour-based registration
 '''
 
 feature_map_paths = FEATURE_MAP_DIR.glob("*.png")
-params.feature_map_path = st.sidebar.radio("Choose a feature map", options=[p.name for p in feature_map_paths])
+params.feature_map_path = st.sidebar.selectbox("Choose a feature map",
+                                               options=[p.name for p in feature_map_paths])
 
 
 @st.cache
@@ -542,23 +538,36 @@ def load_config_and_show():
     result_diff_placeholder.image(image=show_result(result_index), use_column_width=True)
 
     similar_configs = [c for c in configs if c.is_similar_to(config)]
-    similar_results = [c.load_results() for c in similar_configs]
 
     '''
     #### Energy
     '''
     initial_energy = get_energy(moving_memberships, static_distances)
 
-    if len(similar_configs) > 0 and st.checkbox(f'Show energy for {len(similar_configs)} similar configs'):
+    if len(similar_configs) > 0 and st.checkbox(f'Show energy for {len(similar_configs) - 1} similar configs'):
+
+        filter_names = [a.name for a in attr.fields(RunConfiguration) if a.eq and a.name != "feature_map_path"]
+        filters = st.multiselect('What values should be equal?', options=filter_names)
+
         df = pd.DataFrame([attr.asdict(c) for c in similar_configs])
-        df = df.drop(columns=['file_path', 'patch_position'])
-        st.dataframe(df)
+
+        if len(filters) > 0:
+            df = df.query('&'.join(f"{f}==@config.{f}" for f in filters))
+
+        filtered_paths = [Path(p) for p in df['file_path']]
+        similar_results = [c.load_results() for c in similar_configs if c.file_path in filtered_paths]
+
         energies = [[initial_energy] + [r.energy for r in rr.results] for rr in similar_results]
         all_energy = np.concatenate([[[i, j, e] for j, e in enumerate(energy)]
                                      for i, energy in enumerate(energies)],
                                     axis=0)
+
+        df.reset_index(inplace=True, drop=True)
         all_energy_df = pd.DataFrame(all_energy, columns=['id', 'x', 'energy']).join(df, on='id')
-        # st.dataframe(all_energy_df)
+
+        df = df.drop(columns=['file_path', 'patch_position'])
+        st.dataframe(df)
+
         alt_chart = alt.Chart(all_energy_df) \
             .mark_line(point=True) \
             .encode(x='x:Q', y='energy:Q', color='id:N',
