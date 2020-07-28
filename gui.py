@@ -449,10 +449,17 @@ elif transform_type == 'dense displacement':
     if num_dct_coeffs == moving.shape[0]:
         num_dct_coeffs = None
 
+
+transform_dof = 0
+if transform_type == 'linear transform':
+    transform_dof = 8
+elif transform_type == 'dense displacement':
+    transform_dof = 2 * moving.size if num_dct_coeffs is None else 2 * (num_dct_coeffs ** 2)
+st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
 num_iterations = st.sidebar.number_input('number of iterations', min_value=1, max_value=200, value=20)
 
 '''
-### Results
+## Results
 '''
 
 random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
