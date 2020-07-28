@@ -17,7 +17,7 @@ import altair as alt
 from matplotlib.ticker import MaxNLocator
 
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RESULTS_SUFFIX, \
-    RUNS_DIRECTORY, RunResult, StreamlitProgressWrapper
+    RUNS_DIRECTORY, RunResult, StreamlitProgressWrapper, PartialRunConfiguration
 
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
@@ -29,6 +29,25 @@ from methods import estimate_transform_from_binary_correspondences, estimate_tra
     estimate_dense_displacements_from_memberships, estimate_dense_displacements_from_binary_assignments, \
     apply_transform
 from displacement import plot_correspondences, get_energy, plot_projective_transform
+
+
+# constants
+PATCH_SIZE = 80
+PADDING_SIZE = 10
+NUM_PATCH_PAIRS = 1000
+INITIAL_PATCH_PAIR = 250
+PATCH_STRIDE = 16
+
+INITIAL_NUM_CENTROIDS = 8
+MAX_NUM_CENTROIDS = 32
+INITIAL_KDE_RHO = 0.8
+
+INITIAL_NUM_ITERATIONS = 20
+MAX_NUM_ITERATIONS = 200
+
+MAX_SMOOTHNESS = 20000
+INITIAL_SMOOTHNESS = 2000
+SMOOTHNESS_STEP = 100
 
 configs = load_previous_configs()
 
@@ -62,35 +81,35 @@ st.markdown('Here we select two patches that approximately match. The moving pat
 
 feature_map_plot_placeholder = st.empty()
 
-padding_size = 10
 
-'''
+f'''
 ### patch selection
 A simple patch matching algorithm is run on the image to find two similar patches. Similarity is
-measured as the MAE between the images. The number below determines which of the 1000 best pairs to
-pick. The similarity decreases with higher values.
+measured as the MAE between the images. The number below determines which of the {NUM_PATCH_PAIRS}
+best pairs to pick. The similarity decreases with higher values.
 '''
 
 patch_position = st.sidebar.number_input(label='index of the patch pair to choose',
-                                         min_value=1, max_value=1000, value=250)
+                                         min_value=1, max_value=NUM_PATCH_PAIRS,
+                                         value=INITIAL_PATCH_PAIR)
 
 st.sidebar.markdown('---')
 
 
 @st.cache(show_spinner=False)
 def get_patch_pairs():
-    patch_size = 80
-    return find_promising_patch_pairs(feature_map, patch_size=patch_size, stride=16, num_pairs=1000)
+    return find_promising_patch_pairs(feature_map, patch_size=PATCH_SIZE, stride=PATCH_STRIDE,
+                                      num_pairs=NUM_PATCH_PAIRS)
 
 
 patch_pairs = get_patch_pairs()
-patch_slice, window_slice, _ = patch_pairs[1000 - patch_position]
+patch_slice, window_slice, _ = patch_pairs[NUM_PATCH_PAIRS - patch_position]
 
 
 @st.cache
 def get_moving_and_static():
-    padded_window_slice = pad_slices(window_slice, padding=padding_size, assert_shape=feature_map.shape)
-    feature_patch = np.pad(feature_map[patch_slice], padding_size)
+    padded_window_slice = pad_slices(window_slice, padding=PADDING_SIZE, assert_shape=feature_map.shape)
+    feature_patch = np.pad(feature_map[patch_slice], PADDING_SIZE)
     feature_window = feature_map[padded_window_slice]
     return feature_patch, feature_window
 
@@ -141,7 +160,8 @@ if centroid_method == "equidistant":
     Here we simply choose $n$ equidistant directions and intervals.
     '''
     num_centroids = st.sidebar.number_input(label="number of equidistant angles",
-                                            min_value=1, max_value=32, value=8)
+                                            min_value=1, max_value=MAX_NUM_CENTROIDS,
+                                            value=INITIAL_NUM_CENTROIDS)
 
 elif centroid_method == 'histogram clustering':
     r'''
@@ -158,7 +178,7 @@ elif centroid_method == 'histogram clustering':
     $\rho\in (0,1)$ is the smoothness parameter, where higher values lead to a less-smoothed estimate.
     '''
     kde_rho = st.sidebar.slider(label='rho-value for the KDE',
-                                min_value=0., max_value=1., value=0.8)
+                                min_value=0., max_value=1., value=INITIAL_KDE_RHO)
 
 st.sidebar.markdown('---')
 
@@ -442,8 +462,8 @@ if transform_type == "linear transform":
     '''
 
 elif transform_type == 'dense displacement':
-    smoothness = st.sidebar.slider('warp field smoothness', min_value=0, max_value=10000,
-                                   value=2000, step=100)
+    smoothness = st.sidebar.slider('warp field smoothness', min_value=0, max_value=MAX_SMOOTHNESS,
+                                   value=INITIAL_SMOOTHNESS, step=SMOOTHNESS_STEP)
     num_dct_coeffs = st.sidebar.slider('spectral coefficients', min_value=1,
                                        max_value=moving.shape[0], value=moving.shape[0])
     if num_dct_coeffs == moving.shape[0]:
@@ -456,7 +476,9 @@ if transform_type == 'linear transform':
 elif transform_type == 'dense displacement':
     transform_dof = 2 * moving.size if num_dct_coeffs is None else 2 * (num_dct_coeffs ** 2)
 st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
-num_iterations = st.sidebar.number_input('number of iterations', min_value=1, max_value=200, value=20)
+num_iterations = st.sidebar.number_input('number of iterations',
+                                         min_value=1, max_value=MAX_NUM_ITERATIONS,
+                                         value=INITIAL_NUM_ITERATIONS)
 
 '''
 ## Results
@@ -556,6 +578,7 @@ elif st.sidebar.button("Run calculation"):
     pbar = StreamlitProgressWrapper(total=num_iterations)
 
     # run calculation
+    # TODO improve this
     results = None
     common_params = dict(moving=moving, static=static, n_iter=num_iterations, centroids=centroids,
                          intervals=intervals, progress_bar=pbar)

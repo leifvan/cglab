@@ -21,11 +21,10 @@ class RunResult:
     results: List[TransformResult] = attr.ib()
     warped_moving: list = attr.ib()
 
-@attr.s(frozen=True)
-class RunConfiguration:
-    _similarity_params = ('patch_position',)
 
-    # TODO also save feature map (path)
+@attr.s
+class PartialRunConfiguration:
+    feature_map_path: str = attr.ib(default=None)
     file_path: str = attr.ib(default=None, eq=False)
     patch_position: int = attr.ib(default=None)
     centroid_method: str = attr.ib(default=None)
@@ -36,6 +35,11 @@ class RunConfiguration:
     smoothness: int = attr.ib(default=None)
     num_dct_coeffs: int = attr.ib(default=None)
     num_iterations: int = attr.ib(default=None)
+
+
+@attr.s(frozen=True)
+class RunConfiguration(PartialRunConfiguration):
+    _similarity_params = ('patch_position',)
 
     def fulfills(self, proto_config: 'RunConfiguration'):
         attr_names = attr.fields_dict(RunConfiguration)
@@ -78,9 +82,6 @@ class RunConfiguration:
         descs.append(f"using {self.assignment_type} for {self.num_iterations} iterations.")
 
         return ' '.join(descs)
-
-
-
 
 
 class StreamlitProgressWrapper:
