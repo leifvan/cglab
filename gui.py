@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 import pickle
 import random
-import os
+#import os
 import string
 import time
 from functools import partial
@@ -29,8 +29,11 @@ from methods import estimate_transform_from_binary_correspondences, estimate_tra
     estimate_dense_displacements_from_memberships, estimate_dense_displacements_from_binary_assignments, \
     apply_transform
 from displacement import plot_correspondences, get_energy, plot_projective_transform
+from pathlib import Path
 
 # constants
+FEATURE_MAP_DIR = Path("data/feature_maps")
+
 PATCH_SIZE = 80
 PADDING_SIZE = 10
 NUM_PATCH_PAIRS = 1000
@@ -52,9 +55,17 @@ configs = load_previous_configs()
 params = PartialRunConfiguration()
 
 
+'''
+# Contour-based registration
+'''
+
+feature_map_paths = FEATURE_MAP_DIR.glob("*.png")
+params.feature_map_path = st.sidebar.radio("Choose a feature map", options=[p.name for p in feature_map_paths])
+
+
 @st.cache
 def get_feature_map():
-    feature_map = imageio.imread("data/cobblestone_floor_03_AO_1k_modified.png").astype(np.float32)
+    feature_map = imageio.imread(FEATURE_MAP_DIR / params.feature_map_path).astype(np.float32)
 
     if len(feature_map.shape) == 3:
         feature_map = np.mean(feature_map, axis=2)
@@ -69,8 +80,7 @@ def get_feature_map():
 feature_map = get_feature_map()
 
 '''
-# Contour-based registration
-### feature map
+### patch pair
 '''
 
 st.markdown('Here we select two patches that approximately match. The moving patch is colored in '
@@ -480,8 +490,8 @@ params.num_iterations = st.sidebar.number_input('number of iterations',
 ## Results
 '''
 
-random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
-params.file_path = os.path.join(RUNS_DIRECTORY, random_name + CONFIG_SUFFIX)
+random_name = Path(''.join(random.choices(string.ascii_lowercase, k=16)) + CONFIG_SUFFIX)
+params.file_path = RUNS_DIRECTORY / random_name
 config = RunConfiguration(**attr.asdict(params))
 
 
