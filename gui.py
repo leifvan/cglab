@@ -30,7 +30,6 @@ from methods import estimate_transform_from_binary_correspondences, estimate_tra
     apply_transform
 from displacement import plot_correspondences, get_energy, plot_projective_transform
 
-
 # constants
 PATCH_SIZE = 80
 PADDING_SIZE = 10
@@ -50,6 +49,7 @@ INITIAL_SMOOTHNESS = 2000
 SMOOTHNESS_STEP = 100
 
 configs = load_previous_configs()
+params = PartialRunConfiguration()
 
 
 @st.cache
@@ -81,7 +81,6 @@ st.markdown('Here we select two patches that approximately match. The moving pat
 
 feature_map_plot_placeholder = st.empty()
 
-
 f'''
 ### patch selection
 A simple patch matching algorithm is run on the image to find two similar patches. Similarity is
@@ -89,9 +88,9 @@ measured as the MAE between the images. The number below determines which of the
 best pairs to pick. The similarity decreases with higher values.
 '''
 
-patch_position = st.sidebar.number_input(label='index of the patch pair to choose',
-                                         min_value=1, max_value=NUM_PATCH_PAIRS,
-                                         value=INITIAL_PATCH_PAIR)
+params.patch_position = st.sidebar.number_input(label='index of the patch pair to choose',
+                                                min_value=1, max_value=NUM_PATCH_PAIRS,
+                                                value=INITIAL_PATCH_PAIR)
 
 st.sidebar.markdown('---')
 
@@ -103,7 +102,7 @@ def get_patch_pairs():
 
 
 patch_pairs = get_patch_pairs()
-patch_slice, window_slice, _ = patch_pairs[NUM_PATCH_PAIRS - patch_position]
+patch_slice, window_slice, _ = patch_pairs[NUM_PATCH_PAIRS - params.patch_position]
 
 
 @st.cache
@@ -151,19 +150,18 @@ Now we are looking for the main directions of gradients in the image. For each m
 need an interval s.t. every angle in that interval is assigned to the main direction.
 '''
 
-centroid_method = st.sidebar.radio(label="how to determine main gradient directions",
-                                   options=("equidistant", "histogram clustering"))
-num_centroids = kde_rho = None
+params.centroid_method = st.sidebar.radio(label="how to determine main gradient directions",
+                                          options=("equidistant", "histogram clustering"))
 
-if centroid_method == "equidistant":
+if params.centroid_method == "equidistant":
     '''
     Here we simply choose $n$ equidistant directions and intervals.
     '''
-    num_centroids = st.sidebar.number_input(label="number of equidistant angles",
-                                            min_value=1, max_value=MAX_NUM_CENTROIDS,
-                                            value=INITIAL_NUM_CENTROIDS)
+    params.num_centroids = st.sidebar.number_input(label="number of equidistant angles",
+                                                   min_value=1, max_value=MAX_NUM_CENTROIDS,
+                                                   value=INITIAL_NUM_CENTROIDS)
 
-elif centroid_method == 'histogram clustering':
+elif params.centroid_method == 'histogram clustering':
     r'''
     Use a direct kernel density estimation on the angles and take the maxima of the resulting
     function as the dominant gradient directions. As the angle histogram is periodic, we use a
@@ -177,18 +175,18 @@ elif centroid_method == 'histogram clustering':
     $$
     $\rho\in (0,1)$ is the smoothness parameter, where higher values lead to a less-smoothed estimate.
     '''
-    kde_rho = st.sidebar.slider(label='rho-value for the KDE',
-                                min_value=0., max_value=1., value=INITIAL_KDE_RHO)
+    params.kde_rho = st.sidebar.slider(label='rho-value for the KDE',
+                                       min_value=0., max_value=1., value=INITIAL_KDE_RHO)
 
 st.sidebar.markdown('---')
 
 
 @st.cache
 def get_centroids_intervals():
-    if centroid_method == 'equidistant':
-        return get_n_equidistant_angles_and_intervals(num_centroids)
-    elif centroid_method == 'histogram clustering':
-        return get_main_gradient_angles_and_intervals(moving, kde_rho)
+    if params.centroid_method == 'equidistant':
+        return get_n_equidistant_angles_and_intervals(params.num_centroids)
+    elif params.centroid_method == 'histogram clustering':
+        return get_main_gradient_angles_and_intervals(moving, params.kde_rho)
 
 
 centroids, intervals = get_centroids_intervals()
@@ -225,7 +223,7 @@ def get_kde_plot_data():
     scores = wrapped_cauchy_kernel_density(theta=sample_points[:, None],
                                            samples=angles[:, None],
                                            weights=magnitudes,
-                                           rho=kde_rho)
+                                           rho=params.kde_rho)
     return sample_points, scores
 
 
@@ -249,7 +247,7 @@ def plot_angles():
     ax.set_theta_zero_location('W')
     ax.set_theta_direction(-1)
 
-    if centroid_method == 'histogram clustering':
+    if params.centroid_method == 'histogram clustering':
         sample_points, scores = get_kde_plot_data()
         ax.plot(sample_points, scores)
         ax.set_ylim(0, scores.max())
@@ -303,9 +301,9 @@ def get_static_assignments_distances_directions():
 
 static_assignments, static_distances, static_directions = get_static_assignments_distances_directions()
 
-assignment_type = st.sidebar.radio('assignment type', options=("binary", "memberships"))
+params.assignment_type = st.sidebar.radio('assignment type', options=("binary", "memberships"))
 
-if assignment_type == 'memberships':
+if params.assignment_type == 'memberships':
 
     r'''
     ### Memberships
@@ -384,13 +382,13 @@ if assignment_type == 'memberships':
 ### Fit a transformation
 '''
 
-transform_type = st.sidebar.radio(label='transform type', options=("linear transform",
-                                                                   "dense displacement"))
+params.transform_type = st.sidebar.radio(label='transform type', options=("linear transform",
+                                                                          "dense displacement"))
 transform_type_to_name = {'linear transform': 'projective transformation',
                           'dense displacement': 'dense displacement map'}
 
 f'''
-We can now fit a *{transform_type_to_name[transform_type]}*.
+We can now fit a *{transform_type_to_name[params.transform_type]}*.
 '''
 
 r'''
@@ -407,7 +405,7 @@ $(i',j')$ in $S$. The coloring denotes from which main direction $\phi$ the
 correspondence originates.
 '''
 
-if assignment_type == 'memberships':
+if params.assignment_type == 'memberships':
     '''
     The correspondences will be weighted by the membership values (see above). In the following
     plot, the weights are depicted by the transparency of the arrows.
@@ -420,18 +418,17 @@ write_centroid_legend()
 def plot_binary_correspondences():
     plt.figure()
     plot_correspondences(moving, static, centroids,
-                         moving_assignments if assignment_type == 'binary' else moving_memberships,
+                         moving_assignments if params.assignment_type == 'binary' else moving_memberships,
                          static_distances, static_directions)
     plt.title("correspondences from " +
-              ("binary assignments" if assignment_type == 'binary' else "memberships"))
+              ("binary assignments" if params.assignment_type == 'binary' else "memberships"))
     plt.tight_layout()
     return figure_to_image()
 
 
 st.image(plot_binary_correspondences())
 
-smoothness = num_dct_coeffs = None
-if transform_type == "linear transform":
+if params.transform_type == "linear transform":
 
     r'''
     The projective transform
@@ -461,36 +458,31 @@ if transform_type == "linear transform":
     $$
     '''
 
-elif transform_type == 'dense displacement':
-    smoothness = st.sidebar.slider('warp field smoothness', min_value=0, max_value=MAX_SMOOTHNESS,
-                                   value=INITIAL_SMOOTHNESS, step=SMOOTHNESS_STEP)
-    num_dct_coeffs = st.sidebar.slider('spectral coefficients', min_value=1,
-                                       max_value=moving.shape[0], value=moving.shape[0])
-    if num_dct_coeffs == moving.shape[0]:
-        num_dct_coeffs = None
+elif params.transform_type == 'dense displacement':
+    params.smoothness = st.sidebar.slider('warp field smoothness', min_value=0, max_value=MAX_SMOOTHNESS,
+                                          value=INITIAL_SMOOTHNESS, step=SMOOTHNESS_STEP)
+    params.num_dct_coeffs = st.sidebar.slider('spectral coefficients', min_value=1,
+                                              max_value=moving.shape[0], value=moving.shape[0])
+    if params.num_dct_coeffs == moving.shape[0]:
+        params.num_dct_coeffs = None
 
-
-transform_dof = 0
-if transform_type == 'linear transform':
+transform_dof = None
+if params.transform_type == 'linear transform':
     transform_dof = 8
-elif transform_type == 'dense displacement':
-    transform_dof = 2 * moving.size if num_dct_coeffs is None else 2 * (num_dct_coeffs ** 2)
+elif params.transform_type == 'dense displacement':
+    transform_dof = 2 * moving.size if params.num_dct_coeffs is None else 2 * (params.num_dct_coeffs ** 2)
 st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
-num_iterations = st.sidebar.number_input('number of iterations',
-                                         min_value=1, max_value=MAX_NUM_ITERATIONS,
-                                         value=INITIAL_NUM_ITERATIONS)
+params.num_iterations = st.sidebar.number_input('number of iterations',
+                                                min_value=1, max_value=MAX_NUM_ITERATIONS,
+                                                value=INITIAL_NUM_ITERATIONS)
 
 '''
 ## Results
 '''
 
 random_name = ''.join(random.choices(string.ascii_lowercase, k=16))
-config = RunConfiguration(file_path=os.path.join(RUNS_DIRECTORY, random_name + CONFIG_SUFFIX),
-                          patch_position=patch_position, centroid_method=centroid_method,
-                          num_centroids=num_centroids, kde_rho=kde_rho,
-                          assignment_type=assignment_type, transform_type=transform_type,
-                          smoothness=smoothness, num_dct_coeffs=num_dct_coeffs,
-                          num_iterations=num_iterations)
+params.file_path = os.path.join(RUNS_DIRECTORY, random_name + CONFIG_SUFFIX)
+config = RunConfiguration(**attr.asdict(params))
 
 
 def load_config_and_show():
@@ -498,8 +490,8 @@ def load_config_and_show():
 
     result_index_placeholder = st.empty()
     result_index = result_index_placeholder.slider(label="Pick frame", min_value=0,
-                                                   max_value=num_iterations,
-                                                   value=num_iterations, step=1,
+                                                   max_value=config.num_iterations,
+                                                   value=config.num_iterations, step=1,
                                                    key="result_index_slider_initial")
 
     animate_button_placeholder = st.empty()
@@ -512,10 +504,11 @@ def load_config_and_show():
         axs[0].imshow(get_colored_difference_image(moving, static))
 
         if i > 0:
-            if transform_type == 'linear transform':
-                plot_projective_transform(run_result.results[i-1].stacked_transform, ax=axs[1])
-            elif transform_type == 'dense displacement':
-                local_transform = run_result.results[i-1].stacked_transform - np.mgrid[:moving.shape[0], :moving.shape[1]]
+            if params.transform_type == 'linear transform':
+                plot_projective_transform(run_result.results[i - 1].stacked_transform, ax=axs[1])
+            elif params.transform_type == 'dense displacement':
+                local_transform = run_result.results[i - 1].stacked_transform - np.mgrid[:moving.shape[0],
+                                                                                :moving.shape[1]]
                 plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[1])
         axs[2].imshow(get_colored_difference_image(warped_moving, static))
 
@@ -525,14 +518,15 @@ def load_config_and_show():
     result_diff_placeholder = st.empty()
 
     if animate_button_placeholder.button(label='Animate'):
-        for i in range(num_iterations + 1):
+        for i in range(config.num_iterations + 1):
             result_diff_placeholder.image(image=show_result(i), use_column_width=True)
-            result_index_placeholder.slider(label="Animating...", min_value=0, max_value=num_iterations,
+            result_index_placeholder.slider(label="Animating...", min_value=0,
+                                            max_value=config.num_iterations,
                                             value=i, step=1)
             time.sleep(0.5)
         result_index = result_index_placeholder.slider(label="Pick frame", min_value=0,
-                                                       max_value=num_iterations,
-                                                       value=num_iterations, step=1,
+                                                       max_value=config.num_iterations,
+                                                       value=config.num_iterations, step=1,
                                                        key="result_index_slider_post_animate")
 
     result_diff_placeholder.image(image=show_result(result_index), use_column_width=True)
@@ -575,13 +569,13 @@ if config in configs:
 
 elif st.sidebar.button("Run calculation"):
 
-    pbar = StreamlitProgressWrapper(total=num_iterations)
+    pbar = StreamlitProgressWrapper(total=config.num_iterations)
 
     # run calculation
     # TODO improve this
     results = None
-    common_params = dict(moving=moving, static=static, n_iter=num_iterations, centroids=centroids,
-                         intervals=intervals, progress_bar=pbar)
+    common_params = dict(moving=moving, static=static, n_iter=config.num_iterations,
+                         centroids=centroids, intervals=intervals, progress_bar=pbar)
     config_to_method_fn_map = {RunConfiguration(transform_type='linear transform',
                                                 assignment_type='binary'):
                                    partial(estimate_transform_from_binary_correspondences,
@@ -594,14 +588,14 @@ elif st.sidebar.button("Run calculation"):
                                                 assignment_type='binary'):
                                    partial(estimate_dense_displacements_from_binary_assignments,
                                            **common_params,
-                                           smooth=smoothness,
-                                           reduce_coeffs=num_dct_coeffs),
+                                           smooth=config.smoothness,
+                                           reduce_coeffs=config.num_dct_coeffs),
                                RunConfiguration(transform_type='dense displacement',
                                                 assignment_type='memberships'):
                                    partial(estimate_dense_displacements_from_memberships,
                                            **common_params,
-                                           smooth=smoothness,
-                                           reduce_coeffs=num_dct_coeffs)}
+                                           smooth=config.smoothness,
+                                           reduce_coeffs=config.num_dct_coeffs)}
 
     # find the first fitting config from the map
     for proto_config, fn in config_to_method_fn_map.items():

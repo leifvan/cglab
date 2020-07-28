@@ -67,22 +67,6 @@ class RunConfiguration(PartialRunConfiguration):
         with open(self.file_path.replace(CONFIG_SUFFIX, RESULTS_SUFFIX), 'wb') as results_file:
             pickle.dump(results, results_file)
 
-    def __str__(self):
-        descs = []
-        if self.centroid_method == 'equidistant':
-            descs.append(f"for {self.num_centroids} equidistant main directions,")
-        else:
-            descs.append(f"for KDE-estimated angles with rho={self.kde_rho},")
-
-        descs.append(f"fit a {self.transform_type}")
-
-        if self.smoothness:
-            descs.append(f"with smoothness={self.smoothness}")
-
-        descs.append(f"using {self.assignment_type} for {self.num_iterations} iterations.")
-
-        return ' '.join(descs)
-
 
 class StreamlitProgressWrapper:
     def __init__(self, total, parent=st):
