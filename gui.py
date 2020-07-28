@@ -524,6 +524,13 @@ def load_config_and_show():
     result_diff_placeholder = st.empty()
 
     if animate_button_placeholder.button(label='Animate'):
+        # populate cache to prevent laggy animation
+        result_diff_placeholder.progress(0.)
+        for i in range(config.num_iterations + 1):
+            show_result(i)
+            result_diff_placeholder.progress(i / (config.num_iterations))
+
+
         for i in range(config.num_iterations + 1):
             result_diff_placeholder.image(image=show_result(i), use_column_width=True)
             result_index_placeholder.slider(label="Animating...", min_value=0,
