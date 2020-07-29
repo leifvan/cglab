@@ -47,6 +47,8 @@ MAX_SMOOTHNESS = 20000
 INITIAL_SMOOTHNESS = 2000
 SMOOTHNESS_STEP = 100
 
+cache_allow_output_mutation = partial(st.cache, allow_output_mutation=True)
+
 configs = load_previous_configs()
 params = PartialRunConfiguration()
 
@@ -59,7 +61,7 @@ params.feature_map_path = st.sidebar.selectbox("Choose a feature map",
                                                options=[p.name for p in feature_map_paths])
 
 
-@st.cache
+@cache_allow_output_mutation
 def get_feature_map():
     feature_map = imageio.imread(FEATURE_MAP_DIR / params.feature_map_path).astype(np.float32)
 
@@ -101,7 +103,7 @@ params.patch_position = st.sidebar.number_input(label='index of the patch pair t
 st.sidebar.markdown('---')
 
 
-@st.cache(show_spinner=False)
+@cache_allow_output_mutation(show_spinner=False)
 def get_patch_pairs():
     return find_promising_patch_pairs(feature_map, patch_size=PATCH_SIZE, stride=PATCH_STRIDE,
                                       num_pairs=NUM_PATCH_PAIRS)
@@ -111,7 +113,7 @@ patch_pairs = get_patch_pairs()
 patch_slice, window_slice, _ = patch_pairs[NUM_PATCH_PAIRS - params.patch_position]
 
 
-@st.cache
+@cache_allow_output_mutation
 def get_moving_and_static():
     padded_window_slice = pad_slices(window_slice, padding=PADDING_SIZE, assert_shape=feature_map.shape)
     feature_patch = np.pad(feature_map[patch_slice], PADDING_SIZE)
@@ -123,7 +125,7 @@ moving, static = get_moving_and_static()
 intersection_slice = get_slice_intersection(patch_slice, window_slice)
 
 
-@st.cache(allow_output_mutation=True)
+@cache_allow_output_mutation
 def plot_colored_feature_map():
     colored_map = 1 - np.tile(feature_map[..., None], reps=(1, 1, 3)) * 0.3
     colored_map[patch_slice[0], patch_slice[1], :] = get_colored_difference_image(moving=feature_map[patch_slice])
@@ -142,7 +144,7 @@ This is an overlay of the two chosen patches.
 '''
 
 
-@st.cache(allow_output_mutation=True)
+@cache_allow_output_mutation
 def plot_moving_static_diff():
     plot_diff(moving, static)
     return figure_to_image()
@@ -187,7 +189,7 @@ elif params.centroid_method == 'histogram clustering':
 st.sidebar.markdown('---')
 
 
-@st.cache
+@cache_allow_output_mutation
 def get_centroids_intervals():
     if params.centroid_method == 'equidistant':
         return get_n_equidistant_angles_and_intervals(params.num_centroids)
@@ -207,7 +209,7 @@ def write_centroid_legend():
     st.markdown(html, unsafe_allow_html=True)
 
 
-@st.cache
+@cache_allow_output_mutation
 def get_kde_plot_data():
     # TODO this is just copy-and-pasted from the code in gradient_directions.py
     angles, magnitudes = get_gradients_in_polar_coords(moving)
@@ -233,7 +235,7 @@ def get_kde_plot_data():
     return sample_points, scores
 
 
-@st.cache(allow_output_mutation=True)
+@cache_allow_output_mutation
 def plot_angles():
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='polar')
@@ -271,7 +273,7 @@ st.image(image=plot_angles())
 write_centroid_legend()
 
 
-@st.cache(allow_output_mutation=True)
+@cache_allow_output_mutation
 def plot_assignments():
     _, axs = plt.subplots(1, 2, figsize=(8, 4))
     moving_assignments = get_binary_assignments_from_centroids(moving, centroids, intervals)
@@ -287,7 +289,7 @@ def plot_assignments():
 st.image(image=plot_assignments(), use_column_width=True)
 
 
-@st.cache(allow_output_mutation=True)
+@cache_allow_output_mutation
 def get_moving_assignments_memberships():
     assignments = get_binary_assignments_from_centroids(moving, centroids, intervals)
     memberships = get_memberships_from_centroids(moving, centroids, intervals)
@@ -297,7 +299,7 @@ def get_moving_assignments_memberships():
 moving_assignments, moving_memberships = get_moving_assignments_memberships()
 
 
-@st.cache(allow_output_mutation=True)
+@cache_allow_output_mutation
 def get_static_assignments_distances_directions():
     assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
     distances = get_distance_transforms_from_binary_assignments(assignments)
@@ -323,7 +325,7 @@ if params.assignment_type == 'memberships':
     '''
 
 
-    @st.cache
+    @cache_allow_output_mutation
     def plot_membership_calculation():
         plt.figure(figsize=(7, 3))
         centroids_degree_values = -(centroids / np.pi * 180 + 180) % 360
@@ -370,7 +372,7 @@ if params.assignment_type == 'memberships':
     write_centroid_legend()
 
 
-    @st.cache(allow_output_mutation=True)
+    @cache_allow_output_mutation
     def plot_memberships():
         plt.figure()
         color = centroids_colors[picked_angle_index]
@@ -420,7 +422,7 @@ if params.assignment_type == 'memberships':
 write_centroid_legend()
 
 
-@st.cache(allow_output_mutation=True)
+@cache_allow_output_mutation
 def plot_binary_correspondences():
     plt.figure()
     plot_correspondences(moving, static, centroids,
@@ -500,9 +502,9 @@ def load_config_and_show():
                                                    value=config.num_iterations, step=1,
                                                    key="result_index_slider_initial")
 
-    animate_button_placeholder = st.empty()
+    run_animate = st.button("Animate")
 
-    @st.cache(allow_output_mutation=True)
+    @cache_allow_output_mutation(show_spinner=False)
     def show_result(i):
         _, axs = plt.subplots(1, 3, figsize=(12, 5))
 
@@ -523,13 +525,12 @@ def load_config_and_show():
 
     result_diff_placeholder = st.empty()
 
-    if animate_button_placeholder.button(label='Animate'):
+    if run_animate:
         # populate cache to prevent laggy animation
-        result_diff_placeholder.progress(0.)
-        for i in range(config.num_iterations + 1):
-            show_result(i)
-            result_diff_placeholder.progress(i / (config.num_iterations))
-
+        # result_diff_placeholder.progress(0.)
+        # for i in range(config.num_iterations + 1):
+        #     show_result(i)
+        #     result_diff_placeholder.progress(i / (config.num_iterations))
 
         for i in range(config.num_iterations + 1):
             result_diff_placeholder.image(image=show_result(i), use_column_width=True)
