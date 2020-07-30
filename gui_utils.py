@@ -10,6 +10,29 @@ from methods import TransformResult
 
 
 @attr.s
+class GuiState:
+    # TODO currently unused
+    feature_map: np.ndarray = attr.ib(default=None)
+
+    patch_pairs: tuple = attr.ib(default=None)
+    patch_slice: slice = attr.ib(default=None)
+    window_slice: slice = attr.ib(default=None)
+    intersection_slice: slice = attr.ib(default=None)
+
+    moving: np.ndarray = attr.ib(default=None)
+    static: np.ndarray = attr.ib(default=None)
+
+    centroids: np.ndarray = attr.ib(default=None)
+    intervals: np.ndarray = attr.ib(default=None)
+
+    moving_assignments: np.ndarray = attr.ib(default=None)
+    moving_memberships: np.ndarray = attr.ib(default=None)
+    static_assignments: np.ndarray = attr.ib(default=None)
+    static_distances: np.ndarray = attr.ib(default=None)
+    static_directions: np.ndarray = attr.ib(default=None)
+
+
+@attr.s
 class RunResult:
     moving: np.ndarray = attr.ib()
     static: np.ndarray = attr.ib()
@@ -110,3 +133,6 @@ RESULTS_SUFFIX = ".results"
 def load_previous_configs():
     config_paths = [p for p in RUNS_DIRECTORY.glob(f"*{CONFIG_SUFFIX}")]
     return [RunConfiguration.load(p) for p in config_paths]
+
+def angle_to_degrees(centroids):
+    return [f"{-(c / np.pi * 180 + 180) % 360:.0f}°" for c in centroids]
