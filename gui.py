@@ -489,7 +489,7 @@ def load_config_and_show():
 
     run_animate = st.button("Animate")
 
-    @cache_allow_output_mutation(show_spinner=False)
+    @cache_allow_output_mutation
     def show_result(i):
         _, axs = plt.subplots(1, 3, figsize=(12, 5))
 
