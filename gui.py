@@ -35,13 +35,12 @@ configs = load_previous_configs()
 params = PartialRunConfiguration()
 
 '''
-# Contour-based registration
+# Gradient-based registration
 '''
 
 feature_map_paths = conf.FEATURE_MAP_DIR.glob("*.png")
 params.feature_map_path = st.sidebar.selectbox("Choose a feature map",
                                                options=[p.name for p in feature_map_paths])
-
 
 @cache_allow_output_mutation
 def get_feature_map():
@@ -50,7 +49,8 @@ def get_feature_map():
     if len(feature_map.shape) == 3:
         feature_map = np.mean(feature_map, axis=2)
 
-    feature_map = skimage.transform.downscale_local_mean(feature_map, (4, 4))
+    feature_map = skimage.transform.downscale_local_mean(feature_map, (conf.DOWNSCALE_FACTOR,
+                                                                       conf.DOWNSCALE_FACTOR))
     feature_map /= feature_map.max()
     feature_map[feature_map > 0.5] = 1
     feature_map[feature_map < 0.5] = 0
@@ -522,18 +522,13 @@ def load_config_and_show():
     result_diff_placeholder = st.empty()
 
     if run_animate:
-        # populate cache to prevent laggy animation
-        # result_diff_placeholder.progress(0.)
-        # for i in range(config.num_iterations + 1):
-        #     show_result(i)
-        #     result_diff_placeholder.progress(i / (config.num_iterations))
-
         for i in range(config.num_iterations + 1):
+            start_time = time.time()
             result_diff_placeholder.image(image=show_result(i), use_column_width=True)
             result_index_placeholder.slider(label="Animating...", min_value=0,
                                             max_value=config.num_iterations,
                                             value=i, step=1)
-            time.sleep(0.5)
+            time.sleep(max(0.5-time.time()+start_time, 0))
         result_index = result_index_placeholder.slider(label="Pick frame", min_value=0,
                                                        max_value=config.num_iterations,
                                                        value=config.num_iterations, step=1,
