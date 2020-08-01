@@ -3,9 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import attr
 import streamlit as st
-from typing import List
+from enum import Enum
+from typing import Sequence, Union
 from pathlib import Path
-
 from methods import TransformResult
 
 
@@ -40,9 +40,8 @@ class RunResult:
     centroids: np.ndarray = attr.ib()
     intervals: np.ndarray = attr.ib()
 
-    results: List[TransformResult] = attr.ib()
+    results: Sequence[TransformResult] = attr.ib()
     warped_moving: list = attr.ib()
-
 
 
 @attr.s
@@ -121,6 +120,7 @@ class StreamlitProgressWrapper:
         self.postfix = postfix
         self._update_label()
 
+
 def figure_to_image():
     canvas = plt.gcf().canvas
     canvas.draw()
@@ -134,9 +134,90 @@ CONFIG_SUFFIX = ".config"
 RESULTS_SUFFIX = ".results"
 
 
+class ParamType(Enum):
+    INTERVAL = "interval"
+    CATEGORICAL = "categorical"
+
+
+class VisType(Enum):
+    DEFAULT = "default"
+
+    # for interval-valued params (default: slider)
+    SLIDER = "slider"
+    NUMBER_INPUT = "stepper"
+
+    # for categorical params (default: radio)
+    RADIO = "radio"
+    SELECTBOX = "choice"
+
+
+def _validate_param_type(instance, attribute, value):
+    return instance.param_type == attribute.metadata['param_type'] or value is None
+
+
+_interval_meta = dict(param_type=ParamType.INTERVAL)
+_categorical_meta = dict(param_type=ParamType.CATEGORICAL)
+
+
+@attr.s
+class ParamDescriptor:
+    param_type: Union[ParamType] = attr.ib()
+    min_value: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
+    max_value: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
+    value: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
+    step: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
+    options: Sequence[str] = attr.ib(default=None, validator=_validate_param_type, metadata=_categorical_meta)
+    vis_type: VisType = attr.ib(default=VisType.DEFAULT)
+
+    @vis_type.validator
+    def _validate_vis_type(self, attribute, value):
+        if self.param_type == ParamType.INTERVAL:
+            return value in (VisType.DEFAULT, VisType.SLIDER, VisType.NUMBER_INPUT)
+        elif self.param_type == ParamType.CATEGORICAL:
+            return value in (VisType.DEFAULT, VisType.RADIO, VisType.SELECTBOX)
+
+    @property
+    def param_dict(self):
+        return attr.asdict(self, filter=lambda a, v: a.metadata and a.metadata['param_type'] == self.param_type)
+
+    def validate_result(self, result):
+        print("hi, I'm validados and today we have a result", result)
+        print("for my instance", self)
+        if self.param_type == ParamType.INTERVAL:
+            return self.min_value <= result <= self.max_value
+        elif self.param_type == ParamType.CATEGORICAL:
+            return result in self.options
+
+
+def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar):
+    factory = None
+    if descriptor.param_type == ParamType.INTERVAL:
+        if descriptor.vis_type in (VisType.DEFAULT, VisType.SLIDER):
+            factory = target.slider
+        elif descriptor.vis_type == VisType.NUMBER_INPUT:
+            factory = target.number_input
+    elif descriptor.param_type == ParamType.CATEGORICAL:
+        if descriptor.vis_type in (VisType.DEFAULT, VisType.RADIO):
+            factory = target.radio
+        elif descriptor.vis_type == VisType.SELECTBOX:
+            factory = target.selectbox
+    else:
+        raise AttributeError(descriptor)
+    value = factory(label, **descriptor.param_dict)
+    assert descriptor.validate_result(value)
+    return value
+
+
+class ValueIterEnum(str, Enum):
+    @classmethod
+    def values(cls):
+        return [c.value for c in cls]
+
+
 def load_previous_configs():
     config_paths = [p for p in RUNS_DIRECTORY.glob(f"*{CONFIG_SUFFIX}")]
     return [RunConfiguration.load(p) for p in config_paths]
+
 
 def angle_to_degrees(centroids):
     return [f"{-(c / np.pi * 180 + 180) % 360:.0f}°" for c in centroids]

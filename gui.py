@@ -22,7 +22,7 @@ from distance_transform import get_binary_assignments_from_centroids, get_distan
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
-    RunResult, StreamlitProgressWrapper, PartialRunConfiguration, GuiState
+    RunResult, StreamlitProgressWrapper, PartialRunConfiguration, GuiState, make_st_widget
 from methods import estimate_transform_from_binary_correspondences, estimate_transform_from_soft_correspondences, \
     estimate_dense_displacements_from_memberships, estimate_dense_displacements_from_binary_assignments, \
     apply_transform, estimate_linear_transform, estimate_dense_displacements
@@ -78,9 +78,8 @@ measured as the MAE between the images. The number below determines which of the
 {conf.NUM_PATCH_PAIRS} best pairs to pick. The similarity decreases with higher values.
 '''
 
-params.patch_position = st.sidebar.number_input(label='index of the patch pair to choose',
-                                                min_value=1, max_value=conf.NUM_PATCH_PAIRS,
-                                                value=conf.INITIAL_PATCH_PAIR)
+params.patch_position = make_st_widget(conf.PATCH_POSITION_DESCRIPTOR,
+                                       label="index of the patch pair to choose")
 
 st.sidebar.markdown('---')
 
@@ -142,18 +141,16 @@ Now we are looking for the main directions of gradients in the image. For each m
 need an interval s.t. every angle in that interval is assigned to the main direction.
 '''
 
-params.centroid_method = st.sidebar.radio(label="how to determine main gradient directions",
-                                          options=("equidistant", "histogram clustering"))
+params.centroid_method = make_st_widget(conf.CENTROID_METHOD_DESCRIPTOR,
+                                        label="how to determine main gradient directions")
 
-if params.centroid_method == "equidistant":
+if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
     '''
     Here we simply choose $n$ equidistant directions and intervals.
     '''
-    params.num_centroids = st.sidebar.number_input(label="number of equidistant angles",
-                                                   min_value=1, max_value=conf.MAX_NUM_CENTROIDS,
-                                                   value=conf.INITIAL_NUM_CENTROIDS)
-
-elif params.centroid_method == 'histogram clustering':
+    params.num_centroids = make_st_widget(conf.NUM_CENTROIDS_DESCRIPTOR,
+                                          label="number of equidistant angles")
+elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
     r'''
     Use a direct kernel density estimation on the angles and take the maxima of the resulting
     function as the dominant gradient directions. As the angle histogram is periodic, we use a
@@ -167,18 +164,21 @@ elif params.centroid_method == 'histogram clustering':
     $$
     $\rho\in (0,1)$ is the smoothness parameter, where higher values lead to a less-smoothed estimate.
     '''
-    params.kde_rho = st.sidebar.slider(label='rho-value for the KDE',
-                                       min_value=0., max_value=1., value=conf.INITIAL_KDE_RHO)
+    params.kde_rho = make_st_widget(conf.KDE_RHO_DESCRIPTOR,
+                                    label="rho-value for the KDE")
+else:
+    raise AttributeError(f"Centroid method incorrect. {params}")
 
 st.sidebar.markdown('---')
 
 
 @cache_allow_output_mutation
 def get_centroids_intervals():
-    if params.centroid_method == 'equidistant':
+    if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
         return get_n_equidistant_angles_and_intervals(params.num_centroids)
-    elif params.centroid_method == 'histogram clustering':
+    elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
         return get_main_gradient_angles_and_intervals(moving, params.kde_rho)
+    raise AttributeError(params)
 
 
 centroids, intervals = get_centroids_intervals()
@@ -254,14 +254,14 @@ st.image(image=plot_angles())
 ### Binary assignments
 '''
 
-params.filter_method = st.sidebar.radio("method for retrieving angle responses",
-                                 options=('Farid derivative filter', 'Gabor filter'))
-if params.filter_method == 'Farid derivative filter':
+params.filter_method = make_st_widget(conf.FILTER_METHOD_DESCRIPTOR,
+                                      label="method for retrieving angle responses")
+if params.filter_method == conf.FilterMethod.FARID_DERIVATIVE:
     get_binary_assignments = get_binary_assignments_from_centroids
     get_memberships = get_memberships_from_centroids
-elif params.filter_method == 'Gabor filter':
-    params.gabor_filter_sigma = st.sidebar.slider("gabor filter sigma", min_value=0.5, max_value=5.,
-                                                  value=2., step=0.5)
+elif params.filter_method == conf.FilterMethod.GABOR:
+    params.gabor_filter_sigma = make_st_widget(conf.GABOR_FILTER_SIGMA_DESCRIPTOR,
+                                               label="gabor filter sigma")
     get_binary_assignments = partial(get_binary_assignments_from_gabor, sigma=params.gabor_filter_sigma)
     get_memberships = partial(get_memberships_from_gabor, sigma=params.gabor_filter_sigma)
 
@@ -304,9 +304,10 @@ def get_static_assignments_distances_directions():
 
 static_assignments, static_distances, static_directions = get_static_assignments_distances_directions()
 
-params.assignment_type = st.sidebar.radio('assignment type', options=("binary", "memberships"))
+params.assignment_type = make_st_widget(conf.ASSIGNMENT_TYPE_DESCRIPTOR,
+                                        label="assignment type")
 
-if params.assignment_type == 'memberships':
+if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
 
     r'''
     ### Memberships
@@ -385,10 +386,10 @@ if params.assignment_type == 'memberships':
 ### Fit a transformation
 '''
 
-params.transform_type = st.sidebar.radio(label='transform type', options=("linear transform",
-                                                                          "dense displacement"))
-transform_type_to_name = {'linear transform': 'projective transformation',
-                          'dense displacement': 'dense displacement map'}
+params.transform_type = make_st_widget(conf.TRANSFORM_TYPE_DESCRIPTOR,
+                                       label="transform type")
+transform_type_to_name = {conf.TransformType.LINEAR: 'projective transformation',
+                          conf.TransformType.DENSE: 'dense displacement map'}
 
 f'''
 We can now fit a *{transform_type_to_name[params.transform_type]}*.
@@ -408,7 +409,7 @@ $(i',j')$ in $S$. The coloring denotes from which main direction $\phi$ the
 correspondence originates.
 '''
 
-if params.assignment_type == 'memberships':
+if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     '''
     The correspondences will be weighted by the membership values (see above). In the following
     plot, the weights are depicted by the transparency of the arrows.
@@ -431,7 +432,7 @@ def plot_binary_correspondences():
 
 st.image(plot_binary_correspondences())
 
-if params.transform_type == "linear transform":
+if params.transform_type == conf.TransformType.LINEAR:
 
     r'''
     The projective transform
@@ -460,27 +461,25 @@ if params.transform_type == "linear transform":
     \end{pmatrix}
     $$
     '''
-    params.l2_regularization_factor = st.sidebar.slider('L2 regularization', min_value=0,
-                                                        max_value=10000, value=0, step=1)
+    params.l2_regularization_factor = make_st_widget(conf.L2_REGULARIZATION_FACTOR_DESCRIPTOR,
+                                                     label="L2 regularization")
 
-elif params.transform_type == 'dense displacement':
-    params.smoothness = st.sidebar.slider('warp field smoothness', min_value=0,
-                                          max_value=conf.MAX_SMOOTHNESS,
-                                          value=conf.INITIAL_SMOOTHNESS, step=conf.SMOOTHNESS_STEP)
-    params.num_dct_coeffs = st.sidebar.slider('spectral coefficients', min_value=1,
-                                              max_value=moving.shape[0], value=moving.shape[0])
+elif params.transform_type == conf.TransformType.DENSE:
+    params.smoothness = make_st_widget(conf.SMOOTHNESS_DESCRIPTOR,
+                                       label="warp field smoothness")
+    params.num_dct_coeffs = make_st_widget(conf.NUM_DCT_COEFFS_DESCRIPTOR,
+                                           label="spectral coefficients")
     if params.num_dct_coeffs == moving.shape[0]:
         params.num_dct_coeffs = None
 
 transform_dof = None
-if params.transform_type == 'linear transform':
+if params.transform_type == conf.TransformType.LINEAR:
     transform_dof = 8
-elif params.transform_type == 'dense displacement':
+elif params.transform_type == conf.TransformType.DENSE:
     transform_dof = 2 * moving.size if params.num_dct_coeffs is None else 2 * (params.num_dct_coeffs ** 2)
 st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
-params.num_iterations = st.sidebar.number_input('number of iterations',
-                                                min_value=1, max_value=conf.MAX_NUM_ITERATIONS,
-                                                value=conf.INITIAL_NUM_ITERATIONS)
+params.num_iterations = make_st_widget(conf.NUM_ITERATIONS_DESCRIPTOR,
+                                       label="number of iterations")
 
 '''
 ## Results
