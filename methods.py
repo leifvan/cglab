@@ -4,7 +4,8 @@ import attr
 from functools import partial
 from displacement import get_energy, estimate_transform_from_memberships, calculate_dense_displacements
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
-    get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids
+    get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
+    get_binary_assignments_from_gabor
 from gradient_directions import get_n_equidistant_angles_and_intervals
 from skimage.transform import AffineTransform
 import scipy.optimize
@@ -107,7 +108,7 @@ def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assi
 
 # TODO replace these as described in the TODO above
 estimate_transform_from_binary_correspondences = partial(estimate_linear_transform,
-                                                         assignments_fn=get_binary_assignments_from_centroids)
+                                                         assignments_fn=get_binary_assignments_from_gabor)
 estimate_transform_from_soft_correspondences = partial(estimate_linear_transform,
                                                        assignments_fn=get_memberships_from_centroids)
 

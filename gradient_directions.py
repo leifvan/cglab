@@ -1,7 +1,7 @@
-from skimage.filters import farid_h, farid_v, gaussian, gabor
+from skimage.filters import farid_h, farid_v, gabor
 import numpy as np
 from random import sample
-from scipy.signal import find_peaks
+from scipy.signal import find_peaks, convolve
 from scipy.spatial.distance import cdist
 import matplotlib.pyplot as plt
 import matplotlib.cm as plt_cm
@@ -132,21 +132,24 @@ def get_n_equidistant_angles_and_intervals(n_angles):
     return centroids-np.pi, intervals-np.pi
 
 
-def apply_gabor_filters(image, n_filters, **kwargs):
-    """
-    Applies ``n_filters`` many gabor filters with evenly spaced orientations to ``image``.
+def get_gabor_filter(angle, sigma):
+    size = 3 * sigma - 1  # filter size
+    lamb = 2 * size  # wavelength
+    yy, xx = np.mgrid[-size:size + 1, -size:size + 1]
+    xxp = xx * np.cos(angle) + yy * np.sin(angle)
+    yyp = -xx * np.sin(angle) + yy * np.cos(angle)
+    gaussian = np.exp(-(xxp ** 2 + yyp ** 2) / (2 * sigma ** 2))
+    wave = np.sin(2 * np.pi * xxp / lamb)
+    filter = gaussian * wave
+    filter = 2 * ((filter - filter.min()) / filter.ptp()) - 1
+    return filter
 
-    :param image: Image to apply the filters to.
-    :param n_filters: Number of filters to apply.
-    :param kwargs: Additional parameters passed to skimage.filters.gabor.
-    :return: An array of shape ``(n_filters, *image.shape)`` containing the (real) filter responses
-        of the applied gabor filters.
-    """
-    responses = np.zeros((n_filters, *image.shape))
-    thetas = np.linspace(0, np.pi, num=n_filters, endpoint=False)
-    for response, theta in zip(responses, thetas):
-        response[:] = gabor(image, theta=theta, **kwargs)[0]
-    return responses, thetas
+
+def apply_gabor_filters(image, centroids, sigma):
+    responses = np.zeros((len(centroids), *image.shape))
+    for response, centroid in zip(responses, centroids):
+        response[:] = convolve(image, get_gabor_filter(centroid, sigma), mode='same')
+    return responses
 
 
 # --------------

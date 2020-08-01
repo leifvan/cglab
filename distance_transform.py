@@ -1,9 +1,18 @@
 import numpy as np
 import numba as nb
 from scipy.ndimage import distance_transform_edt
-from gradient_directions import get_gradients_in_polar_coords
+from gradient_directions import get_gradients_in_polar_coords, apply_gabor_filters
 
 
+def assert_assignments_binary(fn):
+    def _assert_assignments_binary(image, centroids, intervals, **kwargs):
+        assignments = fn(image, centroids, intervals, **kwargs)
+        assert np.all(assignments.sum(axis=0) <= 1)
+        return assignments
+    return _assert_assignments_binary
+
+
+@assert_assignments_binary
 def get_binary_assignments_from_centroids(image, centroids, intervals):
     """
     Assigns each pixel of ``image`` with non-vanishing gradient to one of the angles in
@@ -31,23 +40,24 @@ def get_binary_assignments_from_centroids(image, centroids, intervals):
     return pixel_assignments
 
 
-def get_binary_assignments_from_gabor(responses, threshold):
-    """
-    Assigns each pixel with non-vanishing response to the filter with maximum absolute response.
+@assert_assignments_binary
+def get_binary_assignments_from_gabor(image, centroids, intervals, sigma, threshold=1e-2):
+    # correct the direction
+    responses = -apply_gabor_filters(image, centroids, sigma)
+    responses /= responses.max()
 
-    :param responses: An array (n_filters, height, width) of filter responses from gabor filters.
-    :param threshold: All pixels with a response below this value will not be considered.
-    :return: An array (n_filters, height, width) of binary maps for each filter that assign a
-        pixel with non-vanishing response to exactly one of the filters, i.e. if index [k,i,j] is
-        1, the pixel [i,j] is assigned to filter k.
-    """
-
-    # TODO check if we can create gabor filters that aren't 180°-symmetric
-    assignments = np.zeros_like(responses, dtype=np.bool)
-    argmax = np.argmax(np.abs(responses), axis=0)
+    argmax = np.argmax(responses, axis=0)
+    assignments = np.zeros((len(centroids), *image.shape), dtype=np.bool)
     for i, assignment in enumerate(assignments):
-        assignment[:] = (argmax == i) & ~np.isclose(responses[i], 0, atol=threshold)
+        assignment[:] = (argmax == i) & (~np.isclose(responses[i], 0, atol=threshold))
     return assignments
+
+
+def get_memberships_from_gabor(image, centroids, intervals, sigma, threshold=1e-2):
+    responses = -apply_gabor_filters(image, centroids, sigma)
+    responses /= responses.max()
+    responses[responses <= threshold] = 0
+    return responses
 
 
 def get_distance_transforms_from_binary_assignments(assignments):

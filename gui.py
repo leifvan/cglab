@@ -17,17 +17,17 @@ import streamlit as st
 import gui_config as conf
 from displacement import plot_correspondences, get_energy, plot_projective_transform
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
-    get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids
+    get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
+    get_binary_assignments_from_gabor, get_memberships_from_gabor
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
     RunResult, StreamlitProgressWrapper, PartialRunConfiguration, GuiState
 from methods import estimate_transform_from_binary_correspondences, estimate_transform_from_soft_correspondences, \
     estimate_dense_displacements_from_memberships, estimate_dense_displacements_from_binary_assignments, \
-    apply_transform
+    apply_transform, estimate_linear_transform, estimate_dense_displacements
 from patches import find_promising_patch_pairs
 from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
-
 
 cache_allow_output_mutation = partial(st.cache, allow_output_mutation=True)
 
@@ -254,14 +254,25 @@ st.image(image=plot_angles())
 ### Binary assignments
 '''
 
+params.filter_method = st.sidebar.radio("method for retrieving angle responses",
+                                 options=('Farid derivative filter', 'Gabor filter'))
+if params.filter_method == 'Farid derivative filter':
+    get_binary_assignments = get_binary_assignments_from_centroids
+    get_memberships = get_memberships_from_centroids
+elif params.filter_method == 'Gabor filter':
+    params.gabor_filter_sigma = st.sidebar.slider("gabor filter sigma", min_value=0.5, max_value=5.,
+                                                  value=2., step=0.5)
+    get_binary_assignments = partial(get_binary_assignments_from_gabor, sigma=params.gabor_filter_sigma)
+    get_memberships = partial(get_memberships_from_gabor, sigma=params.gabor_filter_sigma)
+
 write_centroid_legend()
 
 
 @cache_allow_output_mutation
 def plot_assignments():
     _, axs = plt.subplots(1, 2, figsize=(8, 4))
-    moving_assignments = get_binary_assignments_from_centroids(moving, centroids, intervals)
-    static_assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
+    moving_assignments = get_binary_assignments(moving, centroids, intervals)
+    static_assignments = get_binary_assignments(static, centroids, intervals)
     plot_binary_assignments(moving_assignments, centroids, axs[0])
     axs[0].set_title("moving")
     plot_binary_assignments(static_assignments, centroids, axs[1])
@@ -275,8 +286,8 @@ st.image(image=plot_assignments(), use_column_width=True)
 
 @cache_allow_output_mutation
 def get_moving_assignments_memberships():
-    assignments = get_binary_assignments_from_centroids(moving, centroids, intervals)
-    memberships = get_memberships_from_centroids(moving, centroids, intervals)
+    assignments = get_binary_assignments(moving, centroids, intervals)
+    memberships = get_memberships(moving, centroids, intervals)
     return assignments, memberships
 
 
@@ -285,7 +296,7 @@ moving_assignments, moving_memberships = get_moving_assignments_memberships()
 
 @cache_allow_output_mutation
 def get_static_assignments_distances_directions():
-    assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
+    assignments = get_binary_assignments(static, centroids, intervals)
     distances = get_distance_transforms_from_binary_assignments(assignments)
     directions = get_closest_feature_directions_from_binary_assignments(assignments)
     return assignments, distances, directions
@@ -585,35 +596,31 @@ elif st.sidebar.button("Run calculation"):
 
     # run calculation
     # TODO improve this
+    # TODO maybe recompute centroids, intervals etc.?
     results = None
     common_params = dict(moving=moving, static=static, n_iter=config.num_iterations,
                          centroids=centroids, intervals=intervals, progress_bar=pbar)
-    config_to_method_fn_map = {RunConfiguration(transform_type='linear transform',
-                                                assignment_type='binary'):
-                                   partial(estimate_transform_from_binary_correspondences,
-                                           **common_params),
-                               RunConfiguration(transform_type='linear transform',
-                                                assignment_type='memberships'):
-                                   partial(estimate_transform_from_soft_correspondences,
-                                           **common_params),
-                               RunConfiguration(transform_type='dense displacement',
-                                                assignment_type='binary'):
-                                   partial(estimate_dense_displacements_from_binary_assignments,
-                                           **common_params,
-                                           smooth=config.smoothness,
-                                           reduce_coeffs=config.num_dct_coeffs),
-                               RunConfiguration(transform_type='dense displacement',
-                                                assignment_type='memberships'):
-                                   partial(estimate_dense_displacements_from_memberships,
-                                           **common_params,
-                                           smooth=config.smoothness,
-                                           reduce_coeffs=config.num_dct_coeffs)}
 
-    # find the first fitting config from the map
-    for proto_config, fn in config_to_method_fn_map.items():
-        if config.fulfills(proto_config):
-            results = fn()
-            break
+    assignment_fn = None
+    if config.assignment_type == 'binary' and config.filter_method == 'Farid derivative filter':
+        assignment_fn = get_binary_assignments_from_centroids
+    elif config.assignment_type == 'binary' and config.filter_method == 'Gabor filter':
+        assignment_fn = partial(get_binary_assignments_from_gabor, sigma=config.gabor_filter_sigma)
+    elif config.assignment_type == 'memberships' and config.filter_method == 'Farid derivative filter':
+        assignment_fn = get_memberships_from_centroids
+    elif config.assignment_type == 'memberships' and config.filter_method == 'Gabor filter':
+        assignment_fn = partial(get_memberships_from_gabor, sigma=config.gabor_filter_sigma)
+
+    estimate_fn = None
+    if config.transform_type == 'linear transform':
+        estimate_fn = partial(estimate_linear_transform, assignments_fn=assignment_fn,
+                              **common_params)
+    elif config.transform_type == 'dense displacement':
+        estimate_fn = partial(estimate_dense_displacements, assignments_fn=assignment_fn,
+                              smooth=config.smoothness, reduce_coeffs=config.num_dct_coeffs,
+                              **common_params)
+
+    results = estimate_fn()
 
     if results is None:
         st.error("Failed to run config!")

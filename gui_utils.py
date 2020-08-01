@@ -44,11 +44,14 @@ class RunResult:
     warped_moving: list = attr.ib()
 
 
+
 @attr.s
 class PartialRunConfiguration:
     feature_map_path: str = attr.ib(default=None)
     file_path: Path = attr.ib(default=None, eq=False)
     patch_position: int = attr.ib(default=None)
+    filter_method: str = attr.ib(default=None)
+    gabor_filter_sigma: float = attr.ib(default=None)
     centroid_method: str = attr.ib(default=None)
     num_centroids: int = attr.ib(default=None)
     kde_rho: float = attr.ib(default=None)
