@@ -460,6 +460,8 @@ if params.transform_type == "linear transform":
     \end{pmatrix}
     $$
     '''
+    params.l2_regularization_factor = st.sidebar.slider('L2 regularization', min_value=0,
+                                                        max_value=10000, value=0, step=1)
 
 elif params.transform_type == 'dense displacement':
     params.smoothness = st.sidebar.slider('warp field smoothness', min_value=0,
@@ -522,7 +524,7 @@ def load_config_and_show():
     result_diff_placeholder = st.empty()
 
     if run_animate:
-        for i in range(config.num_iterations + 1):
+        for i in range(0, config.num_iterations + 1, 1 + config.num_iterations // 50):
             start_time = time.time()
             result_diff_placeholder.image(image=show_result(i), use_column_width=True)
             result_index_placeholder.slider(label="Animating...", min_value=0,
@@ -609,6 +611,7 @@ elif st.sidebar.button("Run calculation"):
     estimate_fn = None
     if config.transform_type == 'linear transform':
         estimate_fn = partial(estimate_linear_transform, assignments_fn=assignment_fn,
+                              reg_factor=config.l2_regularization_factor,
                               **common_params)
     elif config.transform_type == 'dense displacement':
         estimate_fn = partial(estimate_dense_displacements, assignments_fn=assignment_fn,

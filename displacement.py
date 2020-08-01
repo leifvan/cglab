@@ -106,7 +106,7 @@ def get_energy(memberships, distances):
     return weighted_distances.sum() / memberships.sum()
 
 
-def estimate_projective_transform(src, dst, weights=None):
+def estimate_projective_transform(src, dst, weights=None, reg_factor=0.):
     """
     Estimates an optimal projective transform (in the least-squares sense) given n correspondences
     from ``src`` to ``dst``, i.e. every pair ``(src[i], dst[i])`` is a correspondence. The pairs
@@ -116,6 +116,8 @@ def estimate_projective_transform(src, dst, weights=None):
     :param dst: An array of shape (n, 2) of destination points of the n correspondences.
     :param weights: An optional array of shape (n,) of weights for the n correspondences. If
         ``None``, all correspondences are equally weighted.
+    :param reg_factor: An optional factor for regularizing the least squares solution. See
+        parameter ``damp`` in :func:`scipy.sparse.linalg.lsmr` for details.
     :return: An ``skimage.transform.ProjectiveTransform`` instance that describes an optimal
         projective transform from ``src`` to ``dst`` points.
     """
@@ -123,7 +125,7 @@ def estimate_projective_transform(src, dst, weights=None):
     dst_matrix, dst = _center_and_normalize_points(dst)
     n = len(src)
     a = np.zeros((2 * n, 8))
-    b = np.concatenate([dst[:, 0], dst[:, 1]])
+    b = np.concatenate([dst[:, 0] - src[:, 0], dst[:, 1] - src[:, 1]])
 
     if weights is None:
         weights = np.ones(n)
@@ -148,9 +150,11 @@ def estimate_projective_transform(src, dst, weights=None):
     a[n:] *= sqrt_weights[..., None]
 
     # damp is the lambda of Tikhonov regularization
-    x = lsmr(a, b, damp=0)[0]
+    x = lsmr(a, b, damp=reg_factor)[0]
 
     mat = np.array([*x, 1]).reshape((3, 3))
+    mat[0,0] += 1
+    mat[1,1] += 1
     mat_transformed = np.linalg.inv(dst_matrix) @ mat @ src_matrix
     return ProjectiveTransform(matrix=mat_transformed)
 
@@ -165,7 +169,7 @@ def plot_projective_transform(transform, ax=None):
     ax.imshow(0.8*warped-0.2*unwarped, cmap='bone_r', vmin=0, vmax=1)
 
 
-def estimate_transform_from_memberships(memberships, distances, directions):
+def estimate_transform_from_memberships(memberships, distances, directions, reg_factor=0.):
     """
     Estimates a projective transform based on the correspondences inferred by the given arrays.
     More specifically, each non-null value in ``memberships`` is considered an edge-pixel of a
@@ -184,6 +188,8 @@ def estimate_transform_from_memberships(memberships, distances, directions):
         distances[k, i, j] is the distance of pixel [i,j] to the next edge pixel with angle k.
     :param directions: An array (n_angles, height, width) of angles to the next edge pixel, i.e.
         directions[k, i, j] is the angle from [i,j] to the next edge pixel with angle k.
+    :param reg_factor: An optional factor for regularizing the least squares solution. See
+        parameter ``damp`` in :func:`scipy.sparse.linalg.lsmr` for details.
     :return: An ``skimage.transform.ProjectiveTransform`` instance that describes an optimal
         projective transform (in the least-squares sense) of the inferred correspondences.
     """
@@ -192,4 +198,5 @@ def estimate_transform_from_memberships(memberships, distances, directions):
     uu, vv = angles * distances[aa, yy, xx]
     src = np.stack([xx, yy], axis=1)
     dst = np.stack([xx + vv, yy + uu], axis=1)
-    return estimate_projective_transform(src, dst, weights=memberships[aa, yy, xx])
+    return estimate_projective_transform(src, dst, weights=memberships[aa, yy, xx],
+                                         reg_factor=reg_factor)

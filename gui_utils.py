@@ -58,6 +58,7 @@ class PartialRunConfiguration:
     assignment_type: str = attr.ib(default=None)
     transform_type: str = attr.ib(default=None)
     smoothness: int = attr.ib(default=None)
+    l2_regularization_factor: float = attr.ib(default=None)
     num_dct_coeffs: int = attr.ib(default=None)
     num_iterations: int = attr.ib(default=None)
 
