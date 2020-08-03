@@ -43,6 +43,7 @@ def calculate_dense_displacements(memberships, distances, directions, smooth):
     height, width = distances.shape[1:3]
     yy, xx = np.mgrid[:height, :width]
 
+    # FIXME proper least squares weighting
     feature_gradient_cartesian = np.array([np.sin(directions), np.cos(directions)])
     feature_gradient_cartesian *= distances * memberships
     feature_gradient_cartesian = feature_gradient_cartesian.sum(axis=1)

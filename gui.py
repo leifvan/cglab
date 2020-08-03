@@ -155,8 +155,10 @@ st.image(image=plot_moving_static_diff(), use_column_width=True)
 
 '''
 ### Finding dominant gradient directions
-Now we are looking for the main directions of gradients in the image. For each main direction we also
-need an interval s.t. every angle in that interval is assigned to the main direction.
+Now we are looking for the main directions of gradients in the (static) image. **The following
+statement is not true for Gabor** For each main
+direction we also need an interval s.t. every angle in that interval is assigned to the main
+direction.
 '''
 
 params.centroid_method = make_st_widget(conf.CENTROID_METHOD_DESCRIPTOR,
@@ -198,7 +200,7 @@ def get_centroids_intervals():
     if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
         return get_n_equidistant_angles_and_intervals(params.num_centroids)
     elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
-        return get_main_gradient_angles_and_intervals(moving, params.kde_rho)
+        return get_main_gradient_angles_and_intervals(static, params.kde_rho)
     raise AttributeError(params)
 
 
@@ -491,6 +493,17 @@ if params.transform_type == conf.TransformType.LINEAR:
                                                      value=config.l2_regularization_factor)
 
 elif params.transform_type == conf.TransformType.DENSE:
+    r'''
+    The dense transformation will be fitted using radial basis function (RBF) interpolation. This
+    means the x- and y-offsets $\Delta x(i,j)$ and $\Delta y(i,j)$ for each pixel $(i,j)$ will be
+    interpolated between the offsets induced by the correspondences. Let $\Delta(i,j)$ be one of
+    the offsets. Then the RBF interpolation for a RBF $\varphi(r)$ is given as
+    $$
+    \Delta(i,j) = \sum_{k=1}^n w_k\cdot\varphi\left(\left\lVert \begin{pmatrix}i\\j\end{pmatrix} - 
+        \begin{pmatrix} i_k \\ j_k \end{pmatrix} \right\rVert\right)
+    $$ 
+    where 
+    '''
     params.smoothness = make_st_widget(conf.SMOOTHNESS_DESCRIPTOR,
                                        label="warp field smoothness",
                                        value=config.smoothness)
