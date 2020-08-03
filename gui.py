@@ -38,9 +38,22 @@ params = PartialRunConfiguration()
 # Gradient-based registration
 '''
 
+config = conf.DEFAULT_CONFIG
+config_name = st.sidebar.text_input("load an existing config", max_chars=16, value="")
+if st.sidebar.button("load config"):
+    config_name_to_config = {c.name: c for c in configs}
+    if config_name in config_name_to_config:
+        config = config_name_to_config[config_name]
+        st.sidebar.success("Config loaded.")
+    else:
+        st.sidebar.error("Config not found.")
+
+st.sidebar.markdown("---")
+
 feature_map_paths = conf.FEATURE_MAP_DIR.glob("*.png")
 params.feature_map_path = st.sidebar.selectbox("Choose a feature map",
                                                options=[p.name for p in feature_map_paths])
+
 
 @cache_allow_output_mutation
 def get_feature_map():
@@ -79,7 +92,8 @@ measured as the MAE between the images. The number below determines which of the
 '''
 
 params.patch_position = make_st_widget(conf.PATCH_POSITION_DESCRIPTOR,
-                                       label="index of the patch pair to choose")
+                                       label="index of the patch pair to choose",
+                                       value=config.patch_position)
 
 st.sidebar.markdown('---')
 
@@ -142,14 +156,16 @@ need an interval s.t. every angle in that interval is assigned to the main direc
 '''
 
 params.centroid_method = make_st_widget(conf.CENTROID_METHOD_DESCRIPTOR,
-                                        label="how to determine main gradient directions")
+                                        label="how to determine main gradient directions",
+                                        value=config.centroid_method)
 
 if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
     '''
     Here we simply choose $n$ equidistant directions and intervals.
     '''
     params.num_centroids = make_st_widget(conf.NUM_CENTROIDS_DESCRIPTOR,
-                                          label="number of equidistant angles")
+                                          label="number of equidistant angles",
+                                          value=config.num_centroids)
 elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
     r'''
     Use a direct kernel density estimation on the angles and take the maxima of the resulting
@@ -165,7 +181,8 @@ elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
     $\rho\in (0,1)$ is the smoothness parameter, where higher values lead to a less-smoothed estimate.
     '''
     params.kde_rho = make_st_widget(conf.KDE_RHO_DESCRIPTOR,
-                                    label="rho-value for the KDE")
+                                    label="rho-value for the KDE",
+                                    value=config.kde_rho)
 else:
     raise AttributeError(f"Centroid method incorrect. {params}")
 
@@ -255,13 +272,15 @@ st.image(image=plot_angles())
 '''
 
 params.filter_method = make_st_widget(conf.FILTER_METHOD_DESCRIPTOR,
-                                      label="method for retrieving angle responses")
+                                      label="method for retrieving angle responses",
+                                      value=config.filter_method)
 if params.filter_method == conf.FilterMethod.FARID_DERIVATIVE:
     get_binary_assignments = get_binary_assignments_from_centroids
     get_memberships = get_memberships_from_centroids
 elif params.filter_method == conf.FilterMethod.GABOR:
     params.gabor_filter_sigma = make_st_widget(conf.GABOR_FILTER_SIGMA_DESCRIPTOR,
-                                               label="gabor filter sigma")
+                                               label="gabor filter sigma",
+                                               value=config.gabor_filter_sigma)
     get_binary_assignments = partial(get_binary_assignments_from_gabor, sigma=params.gabor_filter_sigma)
     get_memberships = partial(get_memberships_from_gabor, sigma=params.gabor_filter_sigma)
 
@@ -305,7 +324,8 @@ def get_static_assignments_distances_directions():
 static_assignments, static_distances, static_directions = get_static_assignments_distances_directions()
 
 params.assignment_type = make_st_widget(conf.ASSIGNMENT_TYPE_DESCRIPTOR,
-                                        label="assignment type")
+                                        label="assignment type",
+                                        value=config.assignment_type)
 
 if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
 
@@ -387,7 +407,8 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
 '''
 
 params.transform_type = make_st_widget(conf.TRANSFORM_TYPE_DESCRIPTOR,
-                                       label="transform type")
+                                       label="transform type",
+                                       value=config.transform_type)
 transform_type_to_name = {conf.TransformType.LINEAR: 'projective transformation',
                           conf.TransformType.DENSE: 'dense displacement map'}
 
@@ -462,13 +483,16 @@ if params.transform_type == conf.TransformType.LINEAR:
     $$
     '''
     params.l2_regularization_factor = make_st_widget(conf.L2_REGULARIZATION_FACTOR_DESCRIPTOR,
-                                                     label="L2 regularization")
+                                                     label="L2 regularization",
+                                                     value=config.l2_regularization_factor)
 
 elif params.transform_type == conf.TransformType.DENSE:
     params.smoothness = make_st_widget(conf.SMOOTHNESS_DESCRIPTOR,
-                                       label="warp field smoothness")
+                                       label="warp field smoothness",
+                                       value=config.smoothness)
     params.num_dct_coeffs = make_st_widget(conf.NUM_DCT_COEFFS_DESCRIPTOR,
-                                           label="spectral coefficients")
+                                           label="spectral coefficients",
+                                           value=config.num_dct_coeffs)
     if params.num_dct_coeffs == moving.shape[0]:
         params.num_dct_coeffs = None
 
@@ -479,7 +503,8 @@ elif params.transform_type == conf.TransformType.DENSE:
     transform_dof = 2 * moving.size if params.num_dct_coeffs is None else 2 * (params.num_dct_coeffs ** 2)
 st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
 params.num_iterations = make_st_widget(conf.NUM_ITERATIONS_DESCRIPTOR,
-                                       label="number of iterations")
+                                       label="number of iterations",
+                                       value=config.num_iterations)
 
 '''
 ## Results
@@ -529,7 +554,7 @@ def load_config_and_show():
             result_index_placeholder.slider(label="Animating...", min_value=0,
                                             max_value=config.num_iterations,
                                             value=i, step=1)
-            time.sleep(max(0.5-time.time()+start_time, 0))
+            time.sleep(max(0.5 - time.time() + start_time, 0))
         result_index = result_index_placeholder.slider(label="Pick frame", min_value=0,
                                                        max_value=config.num_iterations,
                                                        value=config.num_iterations, step=1,
@@ -579,6 +604,10 @@ def load_config_and_show():
             'energy': [r.energy for r in run_result.results]})
         altair_chart = alt.Chart(energy_df).mark_line().encode(x='iteration', y='energy', )
         st.altair_chart(altair_chart, use_container_width=True)
+
+    '''Debug output'''
+    if config.transform_type == conf.TransformType.LINEAR:
+        st.code(run_result.results[-1].stacked_transform)
 
 
 if config in configs:

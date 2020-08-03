@@ -79,6 +79,10 @@ class RunConfiguration(PartialRunConfiguration):
     def results_path(self):
         return self.file_path.with_suffix(RESULTS_SUFFIX)
 
+    @property
+    def name(self):
+        return self.file_path.stem
+
     @classmethod
     def load(cls, path):
         with open(path, 'rb') as config_file:
@@ -144,11 +148,12 @@ class VisType(Enum):
 
     # for interval-valued params (default: slider)
     SLIDER = "slider"
-    NUMBER_INPUT = "stepper"
+    NUMBER_INPUT = "number_input"
 
     # for categorical params (default: radio)
     RADIO = "radio"
-    SELECTBOX = "choice"
+    SELECTBOX = "selectbox"
+    MULTISELECT = "multiselect"
 
 
 def _validate_param_type(instance, attribute, value):
@@ -167,6 +172,8 @@ class ParamDescriptor:
     value: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
     step: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
     options: Sequence[str] = attr.ib(default=None, validator=_validate_param_type, metadata=_categorical_meta)
+    index: int = attr.ib(default=None, validator=_validate_param_type, metadata=_categorical_meta)
+    default: Sequence[str] = attr.ib(default=None, validator=_validate_param_type, metadata=_categorical_meta)
     vis_type: VisType = attr.ib(default=VisType.DEFAULT)
 
     @vis_type.validator
@@ -181,16 +188,16 @@ class ParamDescriptor:
         return attr.asdict(self, filter=lambda a, v: a.metadata and a.metadata['param_type'] == self.param_type)
 
     def validate_result(self, result):
-        print("hi, I'm validados and today we have a result", result)
-        print("for my instance", self)
         if self.param_type == ParamType.INTERVAL:
             return self.min_value <= result <= self.max_value
         elif self.param_type == ParamType.CATEGORICAL:
             return result in self.options
 
 
-def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar):
+def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar, value=None,
+                   returns_iterable=False):
     factory = None
+
     if descriptor.param_type == ParamType.INTERVAL:
         if descriptor.vis_type in (VisType.DEFAULT, VisType.SLIDER):
             factory = target.slider
@@ -201,10 +208,25 @@ def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar):
             factory = target.radio
         elif descriptor.vis_type == VisType.SELECTBOX:
             factory = target.selectbox
+        elif descriptor.vis_type == VisType.MULTISELECT:
+            factory = target.multiselect
+            returns_iterable = True
     else:
         raise AttributeError(descriptor)
-    value = factory(label, **descriptor.param_dict)
-    assert descriptor.validate_result(value)
+
+    params = {k:v for k,v in descriptor.param_dict.items() if v is not None}
+    if value is not None:
+        if descriptor.param_type == ParamType.INTERVAL:
+            params['value'] = value
+        elif descriptor.param_type == ParamType.CATEGORICAL:
+            params['index'] = descriptor.options.index(value)
+
+    value = factory(label, **params)
+    if returns_iterable:
+        assert all(descriptor.validate_result(v) for v in value)
+    else:
+        assert descriptor.validate_result(value)
+
     return value
 
 

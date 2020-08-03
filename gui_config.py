@@ -1,5 +1,6 @@
 from pathlib import Path
-from gui_utils import ParamDescriptor, ValueIterEnum, ParamType, VisType
+from gui_utils import ParamDescriptor, ValueIterEnum, ParamType, VisType, PartialRunConfiguration
+from collections import OrderedDict
 
 FEATURE_MAP_DIR = Path("data/feature_maps")
 
@@ -64,3 +65,18 @@ NUM_DCT_COEFFS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0, max
 
 NUM_ITERATIONS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max_value=200,
                                             value=20, step=1, vis_type=VisType.NUMBER_INPUT)
+
+PARAM_DESCRIPTOR_MAP = OrderedDict(patch_position=PATCH_POSITION_DESCRIPTOR,
+                                   filter_method=FILTER_METHOD_DESCRIPTOR,
+                                   gabor_filter_sigma=GABOR_FILTER_SIGMA_DESCRIPTOR,
+                                   centroid_method=CENTROID_METHOD_DESCRIPTOR,
+                                   num_centroids=NUM_CENTROIDS_DESCRIPTOR,
+                                   kde_rho=KDE_RHO_DESCRIPTOR,
+                                   assignment_type=ASSIGNMENT_TYPE_DESCRIPTOR,
+                                   transform_type=TRANSFORM_TYPE_DESCRIPTOR,
+                                   smoothness=SMOOTHNESS_DESCRIPTOR,
+                                   l2_regularization_factor=L2_REGULARIZATION_FACTOR_DESCRIPTOR,
+                                   num_dct_coeffs=NUM_DCT_COEFFS_DESCRIPTOR,
+                                   num_iterations=NUM_ITERATIONS_DESCRIPTOR)
+
+DEFAULT_CONFIG = PartialRunConfiguration(**{param: desc.value for param, desc in PARAM_DESCRIPTOR_MAP.items()})
