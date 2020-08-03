@@ -609,10 +609,6 @@ def load_config_and_show():
         altair_chart = alt.Chart(energy_df).mark_line().encode(x='iteration', y='energy', )
         st.altair_chart(altair_chart, use_container_width=True)
 
-    '''Debug output'''
-    if config.transform_type == conf.TransformType.LINEAR:
-        st.code(run_result.results[-1].stacked_transform)
-
 
 if config in configs:
     config = configs[configs.index(config)]
