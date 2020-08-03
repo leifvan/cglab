@@ -6,10 +6,13 @@ FEATURE_MAP_DIR = Path("data/feature_maps")
 
 PATCH_SIZE = 80
 PADDING_SIZE = 10
-DOWNSCALE_FACTOR = 4
 NUM_PATCH_PAIRS = 1000
 INITIAL_PATCH_PAIR = 250
-PATCH_STRIDE = 16
+# TODO reparameterize this somehow:
+#PATCH_STRIDE = 16
+
+DOWNSCALE_FACTOR_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max_value=4,
+                                              value=4, step=1, vis_type=VisType.NUMBER_INPUT)
 
 PATCH_POSITION_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max_value=1000,
                                             value=250, step=1, vis_type=VisType.NUMBER_INPUT)
@@ -66,7 +69,8 @@ NUM_DCT_COEFFS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0, max
 NUM_ITERATIONS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max_value=200,
                                             value=20, step=1, vis_type=VisType.NUMBER_INPUT)
 
-PARAM_DESCRIPTOR_MAP = OrderedDict(patch_position=PATCH_POSITION_DESCRIPTOR,
+PARAM_DESCRIPTOR_MAP = OrderedDict(downscale_factor=DOWNSCALE_FACTOR_DESCRIPTOR,
+                                   patch_position=PATCH_POSITION_DESCRIPTOR,
                                    filter_method=FILTER_METHOD_DESCRIPTOR,
                                    gabor_filter_sigma=GABOR_FILTER_SIGMA_DESCRIPTOR,
                                    centroid_method=CENTROID_METHOD_DESCRIPTOR,

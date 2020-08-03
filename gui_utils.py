@@ -48,6 +48,7 @@ class RunResult:
 class PartialRunConfiguration:
     feature_map_path: str = attr.ib(default=None)
     file_path: Path = attr.ib(default=None, eq=False)
+    downscale_factor: int = attr.ib(default=None)
     patch_position: int = attr.ib(default=None)
     filter_method: str = attr.ib(default=None)
     gabor_filter_sigma: float = attr.ib(default=None)

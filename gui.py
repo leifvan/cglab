@@ -54,6 +54,10 @@ feature_map_paths = conf.FEATURE_MAP_DIR.glob("*.png")
 params.feature_map_path = st.sidebar.selectbox("Choose a feature map",
                                                options=[p.name for p in feature_map_paths])
 
+params.downscale_factor = make_st_widget(conf.DOWNSCALE_FACTOR_DESCRIPTOR,
+                                         label="downscale factor",
+                                         value=config.downscale_factor)
+
 
 @cache_allow_output_mutation
 def get_feature_map():
@@ -62,8 +66,8 @@ def get_feature_map():
     if len(feature_map.shape) == 3:
         feature_map = np.mean(feature_map, axis=2)
 
-    feature_map = skimage.transform.downscale_local_mean(feature_map, (conf.DOWNSCALE_FACTOR,
-                                                                       conf.DOWNSCALE_FACTOR))
+    feature_map = skimage.transform.downscale_local_mean(feature_map, (params.downscale_factor,
+                                                                       params.downscale_factor))
     feature_map /= feature_map.max()
     feature_map[feature_map > 0.5] = 1
     feature_map[feature_map < 0.5] = 0
@@ -101,7 +105,7 @@ st.sidebar.markdown('---')
 @cache_allow_output_mutation(show_spinner=False)
 def get_patch_pairs():
     return find_promising_patch_pairs(feature_map, patch_size=conf.PATCH_SIZE,
-                                      stride=conf.PATCH_STRIDE,
+                                      stride=64 // params.downscale_factor,
                                       num_pairs=conf.NUM_PATCH_PAIRS)
 
 
