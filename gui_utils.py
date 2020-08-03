@@ -237,7 +237,7 @@ class ValueIterEnum(str, Enum):
         return [c.value for c in cls]
 
 
-def load_previous_configs():
+def load_previous_configs() -> Sequence[RunConfiguration]:
     config_paths = [p for p in RUNS_DIRECTORY.glob(f"*{CONFIG_SUFFIX}")]
     return [RunConfiguration.load(p) for p in config_paths]
 

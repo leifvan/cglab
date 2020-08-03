@@ -16,7 +16,11 @@ configs = load_previous_configs()
 
 def get_config_as_dict(c):
     d = attr.asdict(c)
+    rr = c.load_results()
+    errors = np.array([r.error for r in rr.results])
     d['file_path'] = f"/{d['file_path'].stem}/"
+    d['min_error'] = errors.min()
+    d['final_error'] = errors[-1]
     return d
 
 
@@ -30,6 +34,13 @@ def cast_numpy_type_to_python(arg0, *args):
     elif isinstance(arg0, float):
         return map(float, (arg0, *args))
     raise Exception
+
+
+feature_map_paths = conf.FEATURE_MAP_DIR.glob("*.png")
+feature_map_names = [p.name for p in feature_map_paths]
+st.sidebar.multiselect(label="feature_map_path",
+                       options=feature_map_names,
+                       default=feature_map_names)
 
 
 for param, descriptor in conf.PARAM_DESCRIPTOR_MAP.items():
