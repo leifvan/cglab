@@ -346,7 +346,6 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     
     '''
 
-
     @cache_allow_output_mutation
     def plot_membership_calculation():
         plt.figure(figsize=(7, 3))
@@ -442,15 +441,26 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     plot, the weights are depicted by the transparency of the arrows.
     '''
 
+
+centroids_degrees_and_all = ('-- all --',*centroids_degrees)
+picked_angle = st.selectbox(label="Choose specific angle", options=centroids_degrees_and_all)
+picked_angle_index = centroids_degrees_and_all.index(picked_angle)-1
+
 write_centroid_legend()
 
 
 @cache_allow_output_mutation
 def plot_binary_correspondences():
     plt.figure()
-    plot_correspondences(moving, static, centroids,
-                         moving_assignments if params.assignment_type == 'binary' else moving_memberships,
-                         static_distances, static_directions)
+    if picked_angle_index == -1:
+        plot_correspondences(moving, static, centroids,
+                             moving_assignments if params.assignment_type == 'binary' else moving_memberships,
+                             static_distances, static_directions)
+    else:
+        plot_correspondences(moving, static, centroids[picked_angle_index, None],
+                             moving_assignments[picked_angle_index, None] if params.assignment_type == 'binary'
+                                                                    else moving_memberships[picked_angle_index, None],
+                             static_distances[picked_angle_index, None], static_directions[picked_angle_index, None])
     plt.title("correspondences from " +
               ("binary assignments" if params.assignment_type == 'binary' else "memberships"))
     plt.tight_layout()
