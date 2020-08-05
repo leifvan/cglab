@@ -19,7 +19,7 @@ import numpy as np
 import scipy.interpolate
 import matplotlib.pyplot as plt
 from utils import get_colored_difference_image, angle_to_rgb
-from skimage.transform import ProjectiveTransform, warp
+from skimage.transform import ProjectiveTransform, warp, estimate_transform
 from skimage.transform._geometric import _center_and_normalize_points
 from scipy.sparse.linalg import lsmr
 
@@ -87,7 +87,17 @@ def plot_correspondences(moving, static, centroids, memberships, distances, dire
     uu, vv = angles * distances[aa, yy, xx]
     colors = angle_to_rgb(centroids[aa], with_alpha=True)  # hsv((centroids[aa] + np.pi) / 2 / np.pi)
     colors[:, 3] = memberships[aa, yy, xx] * 0.5
-    ax.imshow(get_colored_difference_image(moving, static))
+
+    base_difference = get_colored_difference_image(moving, static)
+
+    non_null_membership = memberships.sum(axis=0) > 0
+    zero_distance = np.any(distances == 0, axis=0)
+    additional_diff_from_filters = get_colored_difference_image(non_null_membership, zero_distance)
+
+    overlaid_differences = base_difference + 0.3 * additional_diff_from_filters
+    overlaid_differences /= overlaid_differences.max()
+    ax.imshow(overlaid_differences)
+
     ax.quiver(xx, yy, -vv, uu, angles='xy', scale_units='xy', scale=1,
               color=colors)
 
@@ -127,6 +137,7 @@ def estimate_projective_transform(src, dst, weights=None, reg_factor=0.):
     n = len(src)
     a = np.zeros((2 * n, 8))
     b = np.concatenate([dst[:, 0] - src[:, 0], dst[:, 1] - src[:, 1]])
+    #b = np.concatenate([dst[:, 0], dst[:, 1]])
 
     if weights is None:
         weights = np.ones(n)
@@ -158,6 +169,7 @@ def estimate_projective_transform(src, dst, weights=None, reg_factor=0.):
     mat[1,1] += 1
     mat_transformed = np.linalg.inv(dst_matrix) @ mat @ src_matrix
     return ProjectiveTransform(matrix=mat_transformed)
+    #return estimate_transform('projective', src, dst)
 
 
 def plot_projective_transform(transform, ax=None):

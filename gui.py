@@ -91,7 +91,7 @@ feature_map_plot_placeholder = st.empty()
 f'''
 ### patch selection
 A simple patch matching algorithm is run on the image to find two similar patches. Similarity is
-measured as the MAE between the images. The number below determines which of the
+measured as the MAE between the images. The index determines which of the
 {conf.NUM_PATCH_PAIRS} best pairs to pick. The similarity decreases with higher values.
 '''
 
@@ -102,10 +102,11 @@ params.patch_position = make_st_widget(conf.PATCH_POSITION_DESCRIPTOR,
 st.sidebar.markdown('---')
 
 
-@cache_allow_output_mutation(show_spinner=False)
+@cache_allow_output_mutation(show_spinner=False, persist=True)
 def get_patch_pairs():
     return find_promising_patch_pairs(feature_map, patch_size=conf.PATCH_SIZE,
                                       stride=64 // params.downscale_factor,
+                                      padding=conf.PADDING_SIZE,
                                       num_pairs=conf.NUM_PATCH_PAIRS)
 
 
@@ -200,7 +201,7 @@ def get_centroids_intervals():
     if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
         return get_n_equidistant_angles_and_intervals(params.num_centroids)
     elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
-        return get_main_gradient_angles_and_intervals(static, params.kde_rho)
+        return get_main_gradient_angles_and_intervals(moving, params.kde_rho)
     raise AttributeError(params)
 
 
@@ -346,6 +347,7 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     
     '''
 
+
     @cache_allow_output_mutation
     def plot_membership_calculation():
         plt.figure(figsize=(7, 3))
@@ -441,10 +443,9 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     plot, the weights are depicted by the transparency of the arrows.
     '''
 
-
-centroids_degrees_and_all = ('-- all --',*centroids_degrees)
+centroids_degrees_and_all = ('-- all --', *centroids_degrees)
 picked_angle = st.selectbox(label="Choose specific angle", options=centroids_degrees_and_all)
-picked_angle_index = centroids_degrees_and_all.index(picked_angle)-1
+picked_angle_index = centroids_degrees_and_all.index(picked_angle) - 1
 
 write_centroid_legend()
 
@@ -459,7 +460,7 @@ def plot_binary_correspondences():
     else:
         plot_correspondences(moving, static, centroids[picked_angle_index, None],
                              moving_assignments[picked_angle_index, None] if params.assignment_type == 'binary'
-                                                                    else moving_memberships[picked_angle_index, None],
+                             else moving_memberships[picked_angle_index, None],
                              static_distances[picked_angle_index, None], static_directions[picked_angle_index, None])
     plt.title("correspondences from " +
               ("binary assignments" if params.assignment_type == 'binary' else "memberships"))
@@ -596,7 +597,7 @@ def load_config_and_show():
     '''
     initial_energy = get_energy(moving_memberships, static_distances)
 
-    if len(similar_configs) > 0 and st.checkbox(f'Show energy for {len(similar_configs) - 1} similar configs'):
+    if len(similar_configs) > 1 and st.checkbox(f'Show energy for {len(similar_configs) - 1} similar configs'):
 
         filter_names = [a.name for a in attr.fields(RunConfiguration) if a.eq and a.name != "feature_map_path"]
         filters = st.multiselect('What values should be equal?', options=filter_names)
