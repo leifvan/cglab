@@ -133,12 +133,14 @@ def get_n_equidistant_angles_and_intervals(n_angles):
 
 
 def get_gabor_filter(angle, sigma):
-    size = 3 * sigma - 1  # filter size
+    size = max(5, int(5 * sigma - 1))  # filter size
+    if size % 2 == 0:
+        size += 1
     lamb = 2 * size  # wavelength
     yy, xx = np.mgrid[-size:size + 1, -size:size + 1]
     xxp = xx * np.cos(angle) + yy * np.sin(angle)
     yyp = -xx * np.sin(angle) + yy * np.cos(angle)
-    gaussian = np.exp(-(xxp ** 2 + yyp ** 2) / (2 * sigma ** 2))
+    gaussian = np.exp(-(xxp ** 2 + yyp ** 2) / (2 * (sigma ** 2)))
     wave = np.sin(2 * np.pi * xxp / lamb)
     filter = gaussian * wave
     filter = 2 * ((filter - filter.min()) / filter.ptp()) - 1
