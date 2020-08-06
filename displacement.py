@@ -83,7 +83,7 @@ def plot_correspondences(moving, static, centroids, memberships, distances, dire
     ax = ax or plt.gca()
     assert np.all(memberships <= 1)
     aa, yy, xx = np.nonzero(memberships)
-    angles = np.array([np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
+    angles = np.array([-np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
     uu, vv = angles * distances[aa, yy, xx]
     colors = angle_to_rgb(centroids[aa], with_alpha=True)  # hsv((centroids[aa] + np.pi) / 2 / np.pi)
     colors[:, 3] = memberships[aa, yy, xx] * 0.5
