@@ -125,6 +125,7 @@ def get_moving_and_static():
 
 moving, static = get_moving_and_static()
 intersection_slice = get_slice_intersection(patch_slice, window_slice)
+IMAGE_FOR_MAIN_DIRECTIONS = static
 
 
 @cache_allow_output_mutation
@@ -201,7 +202,7 @@ def get_centroids_intervals():
     if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
         return get_n_equidistant_angles_and_intervals(params.num_centroids)
     elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
-        return get_main_gradient_angles_and_intervals(moving, params.kde_rho)
+        return get_main_gradient_angles_and_intervals(IMAGE_FOR_MAIN_DIRECTIONS, params.kde_rho)
     raise AttributeError(params)
 
 
@@ -220,7 +221,7 @@ def write_centroid_legend():
 @cache_allow_output_mutation
 def get_kde_plot_data():
     # TODO this is just copy-and-pasted from the code in gradient_directions.py
-    angles, magnitudes = get_gradients_in_polar_coords(moving)
+    angles, magnitudes = get_gradients_in_polar_coords(IMAGE_FOR_MAIN_DIRECTIONS)
 
     # flatten
     angles = np.ravel(angles)
@@ -556,19 +557,19 @@ def load_config_and_show():
 
     @cache_allow_output_mutation
     def show_result(i):
-        _, axs = plt.subplots(1, 3, figsize=(12, 5))
+        _, axs = plt.subplots(2, 3, figsize=(12, 10))
 
         warped_moving = moving if i == 0 else run_result.warped_moving[i - 1]
-        axs[0].imshow(get_colored_difference_image(moving, static))
+        axs[0,0].imshow(get_colored_difference_image(moving, static))
 
         if i > 0:
             if params.transform_type == 'linear transform':
-                plot_projective_transform(run_result.results[i - 1].stacked_transform, ax=axs[1])
+                plot_projective_transform(run_result.results[i - 1].stacked_transform, ax=axs[0,1])
             elif params.transform_type == 'dense displacement':
                 local_transform = run_result.results[i - 1].stacked_transform - np.mgrid[:moving.shape[0],
                                                                                 :moving.shape[1]]
-                plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[1])
-        axs[2].imshow(get_colored_difference_image(warped_moving, static))
+                plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[0,1])
+        axs[0,2].imshow(get_colored_difference_image(warped_moving, static))
 
         plt.tight_layout()
         return figure_to_image()
