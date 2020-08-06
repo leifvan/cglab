@@ -11,9 +11,9 @@ def assert_assignments_binary(fn):
         return assignments
     return _assert_assignments_binary
 
-
+# FIXME add threshold to docstring
 @assert_assignments_binary
-def get_binary_assignments_from_centroids(image, centroids, intervals):
+def get_binary_assignments_from_centroids(image, centroids, intervals, threshold=1e-8):
     """
     Assigns each pixel of ``image`` with non-vanishing gradient to one of the angles in
     ``centroids`` based on the given intervals.
@@ -28,7 +28,7 @@ def get_binary_assignments_from_centroids(image, centroids, intervals):
     angles, magnitudes = get_gradients_in_polar_coords(image)
     # get a binary map of features for every main angle
     pixel_assignments = np.zeros((len(centroids), *image.shape), dtype=np.bool)
-    mask = ~np.isclose(magnitudes, 0)
+    mask = ~np.isclose(magnitudes, 0, atol=threshold)
 
     for assignment, (low, high) in zip(pixel_assignments, intervals):
         if low < high:

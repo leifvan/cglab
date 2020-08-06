@@ -28,6 +28,8 @@ FILTER_METHOD_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=Filter
 GABOR_FILTER_SIGMA_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0.5, max_value=4.,
                                                 value=2., step=0.1)
 
+RESPONSE_CUTOFF_THRESHOLD = ParamDescriptor(ParamType.INTERVAL, min_value=-4., max_value=0.,
+                                                value=-2., step=0.25, exponential=True)
 
 class CentroidMethod(ValueIterEnum):
     EQUIDISTANT = 'equidistant'
@@ -73,6 +75,7 @@ PARAM_DESCRIPTOR_MAP = OrderedDict(downscale_factor=DOWNSCALE_FACTOR_DESCRIPTOR,
                                    patch_position=PATCH_POSITION_DESCRIPTOR,
                                    filter_method=FILTER_METHOD_DESCRIPTOR,
                                    gabor_filter_sigma=GABOR_FILTER_SIGMA_DESCRIPTOR,
+                                   response_cutoff_threshold=RESPONSE_CUTOFF_THRESHOLD,
                                    centroid_method=CENTROID_METHOD_DESCRIPTOR,
                                    num_centroids=NUM_CENTROIDS_DESCRIPTOR,
                                    kde_rho=KDE_RHO_DESCRIPTOR,

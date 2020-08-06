@@ -18,7 +18,8 @@ import gui_config as conf
 from displacement import plot_correspondences, get_energy, plot_projective_transform
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
-    get_binary_assignments_from_gabor, get_memberships_from_gabor
+    get_binary_assignments_from_gabor, get_memberships_from_gabor, \
+    get_closest_feature_directions_from_distance_transforms
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
@@ -292,14 +293,18 @@ elif params.filter_method == conf.FilterMethod.GABOR:
     get_binary_assignments = partial(get_binary_assignments_from_gabor, sigma=params.gabor_filter_sigma)
     get_memberships = partial(get_memberships_from_gabor, sigma=params.gabor_filter_sigma)
 
+params.response_cutoff_threshold = make_st_widget(conf.RESPONSE_CUTOFF_THRESHOLD,
+                                                  label="response cutoff")
+
+
 write_centroid_legend()
 
 
 @cache_allow_output_mutation
 def plot_assignments():
     _, axs = plt.subplots(1, 2, figsize=(8, 4))
-    moving_assignments = get_binary_assignments(moving, centroids, intervals)
-    static_assignments = get_binary_assignments(static, centroids, intervals)
+    moving_assignments = get_binary_assignments(moving, centroids, intervals, threshold=params.response_cutoff_threshold)
+    static_assignments = get_binary_assignments(static, centroids, intervals, threshold=params.response_cutoff_threshold)
     plot_binary_assignments(moving_assignments, centroids, axs[0])
     axs[0].set_title("moving")
     plot_binary_assignments(static_assignments, centroids, axs[1])
@@ -313,8 +318,8 @@ st.image(image=plot_assignments(), use_column_width=True)
 
 @cache_allow_output_mutation
 def get_moving_assignments_memberships():
-    assignments = get_binary_assignments(moving, centroids, intervals)
-    memberships = get_memberships(moving, centroids, intervals)
+    assignments = get_binary_assignments(moving, centroids, intervals, threshold=params.response_cutoff_threshold)
+    memberships = get_memberships(moving, centroids, intervals, threshold=params.response_cutoff_threshold)
     return assignments, memberships
 
 
@@ -323,9 +328,10 @@ moving_assignments, moving_memberships = get_moving_assignments_memberships()
 
 @cache_allow_output_mutation
 def get_static_assignments_distances_directions():
-    assignments = get_binary_assignments(static, centroids, intervals)
+    assignments = get_binary_assignments(static, centroids, intervals, threshold=params.response_cutoff_threshold)
     distances = get_distance_transforms_from_binary_assignments(assignments)
     directions = get_closest_feature_directions_from_binary_assignments(assignments)
+    #directions = get_closest_feature_directions_from_distance_transforms(distances)
     return assignments, distances, directions
 
 
@@ -561,6 +567,7 @@ def load_config_and_show():
 
         warped_moving = moving if i == 0 else run_result.warped_moving[i - 1]
         axs[0,0].imshow(get_colored_difference_image(moving, static))
+        axs[0,0].set_title("unwarped")
 
         if i > 0:
             if params.transform_type == 'linear transform':
@@ -569,7 +576,30 @@ def load_config_and_show():
                 local_transform = run_result.results[i - 1].stacked_transform - np.mgrid[:moving.shape[0],
                                                                                 :moving.shape[1]]
                 plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[0,1])
+        axs[0,1].set_title("estimated transform")
+
         axs[0,2].imshow(get_colored_difference_image(warped_moving, static))
+        axs[0,2].set_title("warped")
+
+        # SECOND ROW
+        warped_moving_assignments = get_binary_assignments(warped_moving, centroids, intervals,
+                                                           threshold=config.response_cutoff_threshold)
+
+        plot_binary_assignments(static_assignments, centroids, ax=axs[1,0])
+        axs[1,0].set_title("static assignments")
+
+        plot_correspondences(warped_moving, static, centroids, warped_moving_assignments, static_distances,
+                             static_directions, ax=axs[1,1])
+        axs[1,1].set_title("warped correspondences")
+        # if config.assignment_type == conf.AssignmentType.BINARY:
+
+        plot_binary_assignments(warped_moving_assignments, centroids, ax=axs[1,2])
+        # TODO plot memberships somehow
+        # elif config.assignment_type == conf.AssignmentType.MEMBERSHIPS:
+        #     warped_moving_memberships = get_memberships(warped_moving, centroids, intervals,
+        #                                                 threshold=config.response_cutoff_threshold)
+        #     plot_memberships()
+        axs[1, 2].set_title("warped moving assignments")
 
         plt.tight_layout()
         return figure_to_image()

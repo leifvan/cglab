@@ -52,6 +52,7 @@ class PartialRunConfiguration:
     patch_position: int = attr.ib(default=None)
     filter_method: str = attr.ib(default=None)
     gabor_filter_sigma: float = attr.ib(default=None)
+    response_cutoff_threshold: float = attr.ib(default=None)
     centroid_method: str = attr.ib(default=None)
     num_centroids: int = attr.ib(default=None)
     kde_rho: float = attr.ib(default=None)
@@ -162,20 +163,26 @@ def _validate_param_type(instance, attribute, value):
 
 
 _interval_meta = dict(param_type=ParamType.INTERVAL)
+_interval_meta_no_param = dict(param_type=ParamType.INTERVAL)
 _categorical_meta = dict(param_type=ParamType.CATEGORICAL)
 
 
 @attr.s
 class ParamDescriptor:
     param_type: Union[ParamType] = attr.ib()
+    vis_type: VisType = attr.ib(default=VisType.DEFAULT)
+
+    # interval
     min_value: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
     max_value: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
     value: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
     step: float = attr.ib(default=None, validator=_validate_param_type, metadata=_interval_meta)
+    exponential: bool = attr.ib(default=False)
+
+    # categorical
     options: Sequence[str] = attr.ib(default=None, validator=_validate_param_type, metadata=_categorical_meta)
     index: int = attr.ib(default=None, validator=_validate_param_type, metadata=_categorical_meta)
     default: Sequence[str] = attr.ib(default=None, validator=_validate_param_type, metadata=_categorical_meta)
-    vis_type: VisType = attr.ib(default=VisType.DEFAULT)
 
     @vis_type.validator
     def _validate_vis_type(self, attribute, value):
@@ -197,9 +204,13 @@ class ParamDescriptor:
 
 def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar, value=None,
                    returns_iterable=False):
+
+    params = {k: v for k, v in descriptor.param_dict.items() if v is not None}
     factory = None
 
     if descriptor.param_type == ParamType.INTERVAL:
+        if descriptor.exponential:
+            params["format"] = "1e%f"
         if descriptor.vis_type in (VisType.DEFAULT, VisType.SLIDER):
             factory = target.slider
         elif descriptor.vis_type == VisType.NUMBER_INPUT:
@@ -215,7 +226,6 @@ def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar, v
     else:
         raise AttributeError(descriptor)
 
-    params = {k:v for k,v in descriptor.param_dict.items() if v is not None}
     if value is not None:
         if descriptor.param_type == ParamType.INTERVAL:
             params['value'] = value
@@ -224,11 +234,15 @@ def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar, v
 
     value = factory(label, **params)
     if returns_iterable:
+        assert not descriptor.exponential  # not implemented
         assert all(descriptor.validate_result(v) for v in value)
     else:
         assert descriptor.validate_result(value)
 
-    return value
+    if descriptor.exponential:
+        return 10**value
+    else:
+        return value
 
 
 class ValueIterEnum(str, Enum):
