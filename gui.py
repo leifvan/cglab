@@ -535,7 +535,11 @@ transform_dof = None
 if params.transform_type == conf.TransformType.LINEAR:
     transform_dof = 8
 elif params.transform_type == conf.TransformType.DENSE:
-    transform_dof = 2 * moving.size if params.num_dct_coeffs is None else 2 * (params.num_dct_coeffs ** 2)
+    if params.num_dct_coeffs is None or params.num_dct_coeffs == 0:
+        transform_dof = 2 * moving.size
+    else:
+        transform_dof = 2 * (params.num_dct_coeffs ** 2)
+
 st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
 params.num_iterations = make_st_widget(conf.NUM_ITERATIONS_DESCRIPTOR,
                                        label="number of iterations",
@@ -625,6 +629,8 @@ def load_config_and_show():
 
     '''
     #### Energy
+    The energy is determined as the sum of the distances of the correspondences, weighted by the membership
+    and normalized by the sum of memberships.
     '''
     initial_energy = get_energy(moving_memberships, static_distances)
 
@@ -668,6 +674,12 @@ def load_config_and_show():
 if config in configs:
     config = configs[configs.index(config)]
     st.sidebar.text("Calculation done.")
+    if config.is_favorite:
+        st.sidebar.markdown("*Config is saved as favorite.*")
+    elif st.sidebar.button("Save as favorite"):
+        config = RunConfiguration(**{**attr.asdict(config), 'is_favorite': True})
+        config.save()
+
     load_config_and_show()
 
 elif st.sidebar.button("Run calculation"):

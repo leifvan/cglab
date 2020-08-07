@@ -26,7 +26,7 @@ else:
         return d
 
 
-    configs_as_dict = [get_config_as_dict(c) for c in configs]
+    configs_as_dict = [get_config_as_dict(c) for c in configs if c.is_favorite]
     df = pd.DataFrame(configs_as_dict)
 
 

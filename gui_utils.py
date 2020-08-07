@@ -62,6 +62,7 @@ class PartialRunConfiguration:
     l2_regularization_factor: float = attr.ib(default=None)
     num_dct_coeffs: int = attr.ib(default=None)
     num_iterations: int = attr.ib(default=None)
+    is_favorite: bool = attr.ib(default=False, eq=False)
 
 
 @attr.s(frozen=True)
