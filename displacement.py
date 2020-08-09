@@ -22,6 +22,8 @@ from utils import get_colored_difference_image, angle_to_rgb
 from skimage.transform import ProjectiveTransform, warp, estimate_transform
 from skimage.transform._geometric import _center_and_normalize_points
 from scipy.sparse.linalg import lsmr
+from scipy.spatial.distance import pdist, squareform, cdist
+import gui_config as conf
 
 
 # TODO improve docstring for this function
@@ -43,6 +45,7 @@ def calculate_dense_displacements(memberships, distances, directions, smooth, rb
     """
     height, width = distances.shape[1:3]
     yy, xx = np.mgrid[:height, :width]
+    # grid = np.mgrid[:height, :width]
 
     # FIXME proper least squares weighting
     feature_gradient_cartesian = np.array([np.sin(directions), np.cos(directions)])
@@ -52,11 +55,39 @@ def calculate_dense_displacements(memberships, distances, directions, smooth, rb
     all_locations = np.argwhere(np.logical_or.reduce(memberships, axis=0))
     fy, fx = all_locations[:, 0], all_locations[:, 1]
 
-    transposed_coords = np.transpose(feature_gradient_cartesian[:, fy, fx])
-    interpolator = scipy.interpolate.Rbf(fy, fx, transposed_coords, function=rbf_type,
-                                         smooth=smooth, mode='N-D')
-    interpolated = interpolator(yy, xx)
-    return np.moveaxis(interpolated, 2, 0)
+    if rbf_type == conf.RbfType.LINEAR:
+        def psi(r):
+            return r
+    elif rbf_type == conf.RbfType.MULTIQUADRIC:
+        epsilon = 1
+
+        def psi(r):
+            return np.sqrt((1. / epsilon * r) ** 2 + 1)
+    elif rbf_type == conf.RbfType.THIN_PLATE_SPLINES:
+        def psi(r):
+            return r**2 * np.log(r)
+
+
+    print("doing a",rbf_type,"kind of fitting with",len(all_locations),"locations")
+    target_values = np.transpose(feature_gradient_cartesian[:, fy, fx])
+    location_distances = psi(squareform(pdist(all_locations)))
+    #distance_sums = location_distances.sum(axis=1)
+    a_mat = location_distances# - distance_sums[..., None]
+    b_vec = target_values# - distance_sums[..., None]
+
+    y_weights = lsmr(a_mat, b_vec[:, 0], damp=smooth)[0]
+    x_weights = lsmr(a_mat, b_vec[:, 1], damp=smooth)[0]
+    print(y_weights.sum(), x_weights.sum())
+    # y_weights = lsmr(location_distances, target_values[:, 0], damp=smooth)[0]
+    # x_weights = lsmr(location_distances, target_values[:, 1], damp=smooth)[0]
+    weights = np.stack([y_weights, x_weights], axis=1)
+
+    flat_grid = np.stack([yy.ravel(), xx.ravel()], axis=1)
+    grid_location_distances = psi(cdist(flat_grid, all_locations))
+    interpolated = np.transpose(grid_location_distances @ weights)
+
+    return np.reshape(interpolated, (2, 100, 100))
+
 
 
 def plot_correspondences(moving, static, centroids, memberships, distances, directions, ax=None):
@@ -138,7 +169,7 @@ def estimate_projective_transform(src, dst, weights=None, reg_factor=0.):
     n = len(src)
     a = np.zeros((2 * n, 8))
     b = np.concatenate([dst[:, 0] - src[:, 0], dst[:, 1] - src[:, 1]])
-    #b = np.concatenate([dst[:, 0], dst[:, 1]])
+    # b = np.concatenate([dst[:, 0], dst[:, 1]])
 
     if weights is None:
         weights = np.ones(n)
@@ -166,11 +197,11 @@ def estimate_projective_transform(src, dst, weights=None, reg_factor=0.):
     x = lsmr(a, b, damp=reg_factor)[0]
 
     mat = np.array([*x, 1]).reshape((3, 3))
-    mat[0,0] += 1
-    mat[1,1] += 1
+    mat[0, 0] += 1
+    mat[1, 1] += 1
     mat_transformed = np.linalg.inv(dst_matrix) @ mat @ src_matrix
     return ProjectiveTransform(matrix=mat_transformed)
-    #return estimate_transform('projective', src, dst)
+    # return estimate_transform('projective', src, dst)
 
 
 def plot_projective_transform(transform, ax=None):
@@ -180,7 +211,7 @@ def plot_projective_transform(transform, ax=None):
     unwarped = np.zeros((200, 200))
     unwarped[50:150, 50:150] = 1
     warped = warp(unwarped, transform)
-    ax.imshow(0.8*warped-0.2*unwarped, cmap='bone_r', vmin=0, vmax=1)
+    ax.imshow(0.8 * warped - 0.2 * unwarped, cmap='bone_r', vmin=0, vmax=1)
 
 
 def estimate_transform_from_memberships(memberships, distances, directions, reg_factor=0.):

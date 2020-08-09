@@ -63,6 +63,7 @@ TRANSFORM_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=Trans
 class RbfType(ValueIterEnum):
     LINEAR = 'linear'
     MULTIQUADRIC = 'multiquadric'
+    THIN_PLATE_SPLINES = "thin-plate splines"
 
 
 RBF_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=RbfType.values())
