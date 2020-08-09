@@ -116,8 +116,8 @@ estimate_transform_from_soft_correspondences = partial(estimate_linear_transform
                                                        assignments_fn=get_memberships_from_centroids)
 
 
-def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, smooth, assignments_fn,
-                                 reduce_coeffs=None, progress_bar=None):
+def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, smooth, rbf_type,
+                                 assignments_fn, reduce_coeffs=None, progress_bar=None):
     """
     Estimates a dense warp field that minimizes error of correspondences between ``moving``
     and ``static`` by transforming ``moving``. The correspondences are induced by the given
@@ -129,6 +129,7 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
     :param centroids: An array (n_angles,) of main directions.
     :param intervals: An array (n_angles, 2) of interval borders for each angle in ``centroids``.
     :param smooth: L2-regularization factor for the RBFs.
+    :param rbf_type: The type of radial basis function to use.
     :param assignments_fn: A function that determines the assignments of ``moving`` and ``static``.
         Should be one of the functions from :mod:`distance_transform`, e.g.
         :func:`distance_transform.get_binary_assignments_from_centroids`.
@@ -147,7 +148,7 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
             previous_transform = np.mgrid[:moving.shape[0], :moving.shape[1]]
         moving_memberships = assignments_fn(moving, centroids, intervals)
         warp_field = calculate_dense_displacements(moving_memberships, static_distances,
-                                                   static_directions, smooth)
+                                                   static_directions, smooth, rbf_type)
 
         if reduce_coeffs:
             dct = dense_displacement_to_dct(warp_field, reduce_coeffs)

@@ -25,7 +25,7 @@ from scipy.sparse.linalg import lsmr
 
 
 # TODO improve docstring for this function
-def calculate_dense_displacements(memberships, distances, directions, smooth):
+def calculate_dense_displacements(memberships, distances, directions, smooth, rbf_type):
     """
     Calculates a displacement map based on memberships using L2-regularized radial basis
     functions.
@@ -37,6 +37,7 @@ def calculate_dense_displacements(memberships, distances, directions, smooth):
     :param directions: An array (n_angles, height, width) of angles to the next edge pixel, i.e.
         directions[k, i, j] is the angle from [i,j] to the next edge pixel with angle k.
     :param smooth: L2-regularization factor for the RBFs.
+    :param rbf_type: The type of radial basis function to use.
     :return: An array (2, height, width) of y and x displacements for each pixel, i.e. [:,i,j] is
         the displacement (y,x) of pixel [i,j].
     """
@@ -52,7 +53,7 @@ def calculate_dense_displacements(memberships, distances, directions, smooth):
     fy, fx = all_locations[:, 0], all_locations[:, 1]
 
     transposed_coords = np.transpose(feature_gradient_cartesian[:, fy, fx])
-    interpolator = scipy.interpolate.Rbf(fy, fx, transposed_coords, function='linear',
+    interpolator = scipy.interpolate.Rbf(fy, fx, transposed_coords, function=rbf_type,
                                          smooth=smooth, mode='N-D')
     interpolated = interpolator(yy, xx)
     return np.moveaxis(interpolated, 2, 0)

@@ -522,6 +522,7 @@ elif params.transform_type == conf.TransformType.DENSE:
     $$ 
     where 
     '''
+    params.rbf_type = make_st_widget(conf.RBF_TYPE_DESCRIPTOR, label="RBF type", value=config.rbf_type)
     params.smoothness = make_st_widget(conf.SMOOTHNESS_DESCRIPTOR,
                                        label="warp field smoothness",
                                        value=config.smoothness)
@@ -710,7 +711,8 @@ elif st.sidebar.button("Run calculation"):
                               **common_params)
     elif config.transform_type == 'dense displacement':
         estimate_fn = partial(estimate_dense_displacements, assignments_fn=assignment_fn,
-                              smooth=config.smoothness, reduce_coeffs=config.num_dct_coeffs,
+                              smooth=config.smoothness, rbf_type=config.rbf_type,
+                              reduce_coeffs=config.num_dct_coeffs,
                               **common_params)
 
     results = estimate_fn()

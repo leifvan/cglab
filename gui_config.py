@@ -59,8 +59,19 @@ class TransformType(ValueIterEnum):
 
 TRANSFORM_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=TransformType.values())
 
-SMOOTHNESS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0, max_value=20000,
-                                        value=2000, step=100)
+
+class RbfType(ValueIterEnum):
+    LINEAR = 'linear'
+    MULTIQUADRIC = 'multiquadric'
+
+
+RBF_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=RbfType.values())
+
+
+# SMOOTHNESS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0, max_value=20000,
+#                                         value=2000, step=100)
+SMOOTHNESS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1., max_value=8.,
+                                        value=4., step=0.25, exponential=True)
 
 L2_REGULARIZATION_FACTOR_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0,
                                                       max_value=20000, value=2000, step=100)
