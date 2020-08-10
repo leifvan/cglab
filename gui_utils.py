@@ -6,7 +6,7 @@ import streamlit as st
 from enum import Enum
 from typing import Sequence, Union
 from pathlib import Path
-from methods import TransformResult
+from utils import TransformResult
 
 
 @attr.s
@@ -206,7 +206,6 @@ class ParamDescriptor:
 
 def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar, value=None,
                    returns_iterable=False):
-
     params = {k: v for k, v in descriptor.param_dict.items() if v is not None}
     factory = None
 
@@ -242,7 +241,7 @@ def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar, v
         assert descriptor.validate_result(value)
 
     if descriptor.exponential:
-        return 10**value
+        return 10 ** value
     else:
         return value
 

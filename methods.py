@@ -1,8 +1,7 @@
 import numpy as np
 import skimage.transform
-import attr
 from functools import partial
-from displacement import get_energy, estimate_transform_from_memberships, calculate_dense_displacements
+from displacement import get_correspondences_energy, estimate_transform_from_memberships, calculate_dense_displacements
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
     get_binary_assignments_from_gabor
@@ -10,13 +9,7 @@ from gradient_directions import get_n_equidistant_angles_and_intervals
 from skimage.transform import AffineTransform
 import scipy.optimize
 from approximation import dense_displacement_to_dct, dct_to_dense_displacement
-
-
-@attr.s
-class TransformResult:
-    stacked_transform = attr.ib()
-    error = attr.ib()
-    energy = attr.ib()
+from utils import TransformResult
 
 
 def apply_transform(moving, transform):
@@ -60,7 +53,7 @@ def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter, pro
 
         result = TransformResult(stacked_transform=transform,
                                  error=_get_error(warped_moving, static),
-                                 energy=get_energy(memberships, distances))
+                                 energy=get_correspondences_energy(memberships, distances))
         results.append(result)
 
         if progress_bar:
@@ -102,18 +95,12 @@ def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assi
         transform = estimate_transform_from_memberships(moving_assignments,
                                                         static_distances,
                                                         static_directions,
-                                                        reg_factor)
+                                                        reg_factor,
+                                                        centroids)
         # we use transform classes from skimage here, they can be concatenated with +
         return transform if previous_transform is None else transform + previous_transform
 
     return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter, progress_bar)
-
-
-# TODO replace these as described in the TODO above
-estimate_transform_from_binary_correspondences = partial(estimate_linear_transform,
-                                                         assignments_fn=get_binary_assignments_from_gabor)
-estimate_transform_from_soft_correspondences = partial(estimate_linear_transform,
-                                                       assignments_fn=get_memberships_from_centroids)
 
 
 def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, smooth, rbf_type,
@@ -148,7 +135,7 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
             previous_transform = np.mgrid[:moving.shape[0], :moving.shape[1]]
         moving_memberships = assignments_fn(moving, centroids, intervals)
         warp_field = calculate_dense_displacements(moving_memberships, static_distances,
-                                                   static_directions, smooth, rbf_type)
+                                                   static_directions, smooth, rbf_type, centroids)
 
         if reduce_coeffs:
             dct = dense_displacement_to_dct(warp_field, reduce_coeffs)
@@ -157,46 +144,3 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
         return previous_transform + warp_field
 
     return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter, progress_bar)
-
-
-# TODO replace as discussed above
-estimate_dense_displacements_from_binary_assignments = partial(estimate_dense_displacements,
-                                                               assignments_fn=get_binary_assignments_from_centroids)
-estimate_dense_displacements_from_memberships = partial(estimate_dense_displacements,
-                                                        assignments_fn=get_memberships_from_centroids)
-
-
-def estimate_transform_by_minimizing_energy(moving, static, n_iter, centroids, intervals, smooth, progress_bar=None):
-    static_assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
-    static_distances = get_distance_transforms_from_binary_assignments(static_assignments)
-
-    def opt_wrapper(transform_params):
-        if np.isnan(transform_params).any():
-            return np.inf
-
-        sx, sy, rot, shear, tx, ty = transform_params
-        transform = AffineTransform(scale=(1 + sx, 1 + sy), rotation=rot, shear=shear, translation=(tx, ty))
-        warped = apply_transform(moving, transform)
-
-        if np.isnan(warped).any():
-            return np.inf
-
-        memberships = get_memberships_from_centroids(warped, centroids, intervals)
-        return get_energy(memberships, static_distances)
-
-    results = []
-
-    def callback(x, energy, success):
-        sx, sy, rot, shear, tx, ty = x
-        transform = AffineTransform(scale=(1 + sx, 1 + sy), rotation=rot, shear=shear, translation=(tx, ty))
-        warped = apply_transform(moving, transform)
-        error = _get_error(warped, static)
-        results.append(TransformResult(transform, error=error, energy=energy))
-
-        if progress_bar:
-            progress_bar.update(1)
-            progress_bar.set_postfix(dict(energy=energy, error=error))
-
-        scipy.optimize.basinhopping(opt_wrapper, x0=np.zeros(6), stepsize=1e-6, niter=n_iter, callback=callback)
-
-    return results

@@ -7,6 +7,7 @@ import string
 import imageio
 import os
 import math
+import attr
 
 
 def plot_diff(warped, target, axs=None):
@@ -88,7 +89,6 @@ class GifExporter:
             imageio.imread(path)
             self.image_paths.append(path)
         raise Exception("Either image or path must be None.")
-
 
     def save_gif(self, path, duration=None):
         """
@@ -184,7 +184,15 @@ def get_colored_difference_image(moving=None, static=None):
 def get_slice_intersection(slices_a, slices_b):
     return tuple([slice(max(a.start, b.start), min(a.stop, b.stop)) for a, b in zip(slices_a, slices_b)])
 
+
 def angle_to_rgb(angles, with_alpha=False):
     if with_alpha:
         return plt_cm.get_cmap('hsv')((angles + np.pi) / 2 / np.pi)
     return plt_cm.get_cmap('hsv')((angles + np.pi) / 2 / np.pi)[..., :3]
+
+
+@attr.s
+class TransformResult:
+    stacked_transform = attr.ib()
+    error = attr.ib()
+    energy = attr.ib()

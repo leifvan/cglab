@@ -15,7 +15,7 @@ import skimage.transform
 import streamlit as st
 
 import gui_config as conf
-from displacement import plot_correspondences, get_energy, plot_projective_transform
+from displacement import plot_correspondences, get_correspondences_energy, plot_projective_transform
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
     get_binary_assignments_from_gabor, get_memberships_from_gabor, \
@@ -24,9 +24,7 @@ from gradient_directions import get_n_equidistant_angles_and_intervals, get_main
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
     RunResult, StreamlitProgressWrapper, PartialRunConfiguration, GuiState, make_st_widget
-from methods import estimate_transform_from_binary_correspondences, estimate_transform_from_soft_correspondences, \
-    estimate_dense_displacements_from_memberships, estimate_dense_displacements_from_binary_assignments, \
-    apply_transform, estimate_linear_transform, estimate_dense_displacements
+from methods import  apply_transform, estimate_linear_transform, estimate_dense_displacements
 from patches import find_promising_patch_pairs
 from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
 
@@ -633,7 +631,7 @@ def load_config_and_show():
     The energy is determined as the sum of the distances of the correspondences, weighted by the membership
     and normalized by the sum of memberships.
     '''
-    initial_energy = get_energy(moving_memberships, static_distances)
+    initial_energy = get_correspondences_energy(moving_memberships, static_distances)
 
     if len(similar_configs) > 1 and st.checkbox(f'Show energy for {len(similar_configs) - 1} similar configs'):
 
