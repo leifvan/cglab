@@ -1,21 +1,16 @@
-from skimage.filters import farid_h, farid_v, gabor
+import matplotlib.pyplot as plt
 import numpy as np
-from random import sample
 from scipy.signal import find_peaks, convolve
 from scipy.spatial.distance import cdist
-import matplotlib.pyplot as plt
-import matplotlib.cm as plt_cm
-import matplotlib as mpl
-from itertools import zip_longest
+from skimage.filters import farid_h, farid_v
 
-
-# https://arxiv.org/pdf/1601.05053.pdf
 from utils import angle_to_rgb
 
 
 def wrapped_cauchy_kernel_density(theta, samples, weights, rho):
     """
     Evaluates the estimated density of 1D-samples at given positions ``theta``.
+    https://arxiv.org/pdf/1601.05053.pdf
 
     :param theta: 1D-array of query positions at which the density is evaluated.
     :param samples: 1D-array of sample positions.
@@ -123,13 +118,13 @@ def get_main_gradient_angles_and_intervals(feature_map, rho=0.8):
 
 
 def get_n_equidistant_angles_and_intervals(n_angles):
-    #FIXME does not work for n_angles = 1
+    # FIXME does not work for n_angles = 1
     centroids = np.linspace(0, 2 * np.pi, endpoint=False, num=n_angles)
     bounds_left = (centroids - centroids[1] / 2) % (2 * np.pi)
     bounds_right = centroids + centroids[1] / 2
     intervals = np.stack([bounds_left, bounds_right], axis=1)
     # TODO check for inconsistencies with ranges [-pi, pi] and [0, 2pi], ASSERTIONS!
-    return centroids-np.pi, intervals-np.pi
+    return centroids - np.pi, intervals - np.pi
 
 
 def get_gabor_filter(angle, sigma):
@@ -172,7 +167,7 @@ def plot_gradients_as_arrows(dy, dx, subsample=1, ax=None):
     ax = ax or plt.gca()
     angles = (np.arctan2(dy, dx) + np.pi) / 2 / np.pi
 
-    ax.quiver(-dx, dy, angles, cmap='hsv', clim=(0.,1.))
+    ax.quiver(-dx, dy, angles, cmap='hsv', clim=(0., 1.))
     ax.invert_yaxis()
     ax.set_aspect(dy.shape[1] / dy.shape[0])
     ax.axis('off')
@@ -193,7 +188,7 @@ def plot_distance_transforms(distance_transforms, axes, angles=None):
     for dt, ax, angle in zip(distance_transforms, axes, angles):
         ax.imshow(dt)
         if angle is not None:
-            ax.set_title(f"{angle/np.pi*180}°")
+            ax.set_title(f"{angle / np.pi * 180}°")
 
 
 def plot_feature_directions(feature_directions, axes, angles=None):
@@ -203,4 +198,4 @@ def plot_feature_directions(feature_directions, axes, angles=None):
     for fd, ax, angle in zip(feature_directions, axes, angles):
         plot_polar_gradients(fd, np.ones_like(fd), ax)
         if angle is not None:
-            ax.set_title(f"{angle/np.pi*180}°")
+            ax.set_title(f"{angle / np.pi * 180}°")

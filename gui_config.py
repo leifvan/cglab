@@ -1,6 +1,7 @@
-from pathlib import Path
-from gui_utils import ParamDescriptor, ValueIterEnum, ParamType, VisType, PartialRunConfiguration
 from collections import OrderedDict
+from pathlib import Path
+
+from gui_utils import ParamDescriptor, ValueIterEnum, ParamType, VisType, PartialRunConfiguration
 
 FEATURE_MAP_DIR = Path("data/feature_maps")
 
@@ -9,7 +10,7 @@ PADDING_SIZE = 10
 NUM_PATCH_PAIRS = 1000
 INITIAL_PATCH_PAIR = 250
 # TODO reparameterize this somehow:
-#PATCH_STRIDE = 16
+# PATCH_STRIDE = 16
 
 DOWNSCALE_FACTOR_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max_value=4,
                                               value=4, step=1, vis_type=VisType.NUMBER_INPUT)
@@ -29,7 +30,8 @@ GABOR_FILTER_SIGMA_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0.
                                                 value=2., step=0.1)
 
 RESPONSE_CUTOFF_THRESHOLD = ParamDescriptor(ParamType.INTERVAL, min_value=-4., max_value=0.,
-                                                value=-2., step=0.25, exponential=True)
+                                            value=-2., step=0.25, exponential=True)
+
 
 class CentroidMethod(ValueIterEnum):
     EQUIDISTANT = 'equidistant'
@@ -69,7 +71,6 @@ class RbfType(ValueIterEnum):
 
 
 RBF_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=RbfType.values())
-
 
 # SMOOTHNESS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0, max_value=20000,
 #                                         value=2000, step=100)

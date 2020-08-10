@@ -1,8 +1,7 @@
-import streamlit as st
-from pathlib import Path
-import pandas as pd
 import attr
 import numpy as np
+import pandas as pd
+import streamlit as st
 
 import gui_config as conf
 from gui_utils import load_previous_configs, make_st_widget, ParamDescriptor, ParamType, VisType

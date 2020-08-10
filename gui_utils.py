@@ -1,11 +1,13 @@
 import pickle
-import numpy as np
-import matplotlib.pyplot as plt
-import attr
-import streamlit as st
 from enum import Enum
-from typing import Sequence, Union
 from pathlib import Path
+from typing import Sequence, Union
+
+import attr
+import matplotlib.pyplot as plt
+import numpy as np
+import streamlit as st
+
 from utils import TransformResult
 
 

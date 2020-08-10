@@ -16,15 +16,14 @@ Note that these two arrays require a binary assignment to be generated.
 """
 
 import attr
-import numpy as np
-import scipy.interpolate
 import matplotlib.pyplot as plt
-import gui_config as conf
-from utils import get_colored_difference_image, angle_to_rgb
-from skimage.transform import ProjectiveTransform, warp, estimate_transform
-from skimage.transform._geometric import _center_and_normalize_points
+import numpy as np
 from scipy.sparse.linalg import lsmr
 from scipy.spatial.distance import pdist, squareform, cdist
+from skimage.transform import ProjectiveTransform, warp
+
+import gui_config as conf
+from utils import get_colored_difference_image, angle_to_rgb
 
 
 @attr.s(frozen=True)

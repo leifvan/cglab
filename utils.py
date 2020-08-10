@@ -1,13 +1,14 @@
-from matplotlib import pyplot as plt
-from matplotlib.colors import CSS4_COLORS, to_rgb
-import matplotlib.cm as plt_cm
-import numpy as np
+import math
+import os
 import random
 import string
-import imageio
-import os
-import math
+
 import attr
+import imageio
+import matplotlib.cm as plt_cm
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib.colors import CSS4_COLORS, to_rgb
 
 
 def plot_diff(warped, target, axs=None):
@@ -26,9 +27,6 @@ def plot_diff(warped, target, axs=None):
     """
     if axs is None:
         _, axs = plt.subplots(1, 3, figsize=(12, 4))
-    # axs[0].imshow(warped, cmap='coolwarm', vmin=-1, vmax=1)
-    # axs[1].imshow(warped - target, cmap='coolwarm')
-    # axs[2].imshow(-target, cmap='coolwarm', vmin=-1, vmax=1)
     axs[0].imshow(get_colored_difference_image(moving=warped))
     axs[1].imshow(get_colored_difference_image(moving=warped, static=target))
     axs[2].imshow(get_colored_difference_image(static=target))

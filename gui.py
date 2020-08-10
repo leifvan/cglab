@@ -18,13 +18,12 @@ import gui_config as conf
 from displacement import plot_correspondences, get_correspondences_energy, plot_projective_transform
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
-    get_binary_assignments_from_gabor, get_memberships_from_gabor, \
-    get_closest_feature_directions_from_distance_transforms
+    get_binary_assignments_from_gabor, get_memberships_from_gabor
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
-    RunResult, StreamlitProgressWrapper, PartialRunConfiguration, GuiState, make_st_widget
-from methods import  apply_transform, estimate_linear_transform, estimate_dense_displacements
+    RunResult, StreamlitProgressWrapper, PartialRunConfiguration, make_st_widget
+from methods import apply_transform, estimate_linear_transform, estimate_dense_displacements
 from patches import find_promising_patch_pairs
 from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
 

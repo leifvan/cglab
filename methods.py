@@ -1,14 +1,11 @@
 import numpy as np
 import skimage.transform
-from functools import partial
+
+from approximation import dense_displacement_to_dct, dct_to_dense_displacement
 from displacement import get_correspondences_energy, estimate_transform_from_memberships, calculate_dense_displacements
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
-    get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
-    get_binary_assignments_from_gabor
+    get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids
 from gradient_directions import get_n_equidistant_angles_and_intervals
-from skimage.transform import AffineTransform
-import scipy.optimize
-from approximation import dense_displacement_to_dct, dct_to_dense_displacement
 from utils import TransformResult
 
 
