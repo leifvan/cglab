@@ -51,6 +51,8 @@ class AssignmentType(ValueIterEnum):
 
 ASSIGNMENT_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=AssignmentType.values())
 
+WEIGHT_CORRESPONDENCE_ANGLES_DESCRIPTOR = ParamDescriptor(ParamType.BOOLEAN)
+
 
 class TransformType(ValueIterEnum):
     LINEAR = 'linear transform'

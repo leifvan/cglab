@@ -113,11 +113,12 @@ def calculate_dense_displacements(memberships, distances, directions, smooth, rb
     :return: An array (2, height, width) of y and x displacements for each pixel, i.e. [:,i,j] is
         the displacement (y,x) of pixel [i,j].
     """
-    correspondences = Correspondences.from_memberships(memberships, distances, directions, centroids=None)
+    correspondences = Correspondences.from_memberships(memberships, distances, directions, centroids)
     return estimate_dense_warp_field(correspondences, smooth, rbf_type, memberships.shape[1:])
 
 
-def plot_correspondences(moving, static, centroids, memberships, distances, directions, ax=None):
+def plot_correspondences(moving, static, centroids, memberships, distances, directions,
+                         weight_correspondence_angles, ax=None):
     """
     Plots correspondences for each edge pixel in ``moving`` to its closest pixel in ``centroids``.
     More specifically, each non-null value in ``memberships`` is considered an edge-pixel of a
@@ -141,7 +142,8 @@ def plot_correspondences(moving, static, centroids, memberships, distances, dire
     """
     ax = ax or plt.gca()
     assert np.all(memberships <= 1)
-    c = Correspondences.from_memberships(memberships, distances, directions, centroids)
+    centroids_for_weighting = centroids if weight_correspondence_angles else None
+    c = Correspondences.from_memberships(memberships, distances, directions, centroids_for_weighting)
     aa = c.aa
     yy, xx, uu, vv = c.get_yxuv()
     colors = angle_to_rgb(centroids[aa], with_alpha=True)

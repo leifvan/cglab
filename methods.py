@@ -64,7 +64,7 @@ def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter, pro
 
 
 def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assignments_fn,
-                              reg_factor=0., progress_bar=None):
+                              reg_factor=0., progress_bar=None, weight_correspondence_angles=False):
     """
     Estimates a projective transform that minimizes error of correspondences between ``moving``
     and ``static`` by transforming ``moving``. The correspondences are induced by the given
@@ -90,13 +90,15 @@ def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assi
     static_distances = get_distance_transforms_from_binary_assignments(static_assignments)
     static_directions = get_closest_feature_directions_from_binary_assignments(static_assignments)
 
+    centroids_for_weighting = centroids if weight_correspondence_angles else None
+
     def estimate_fn(moving, static, previous_transform):
         moving_assignments = assignments_fn(moving, centroids, intervals)
         transform = estimate_transform_from_memberships(moving_assignments,
                                                         static_distances,
                                                         static_directions,
                                                         reg_factor,
-                                                        centroids)
+                                                        centroids_for_weighting)
         # we use transform classes from skimage here, they can be concatenated with +
         return transform if previous_transform is None else transform + previous_transform
 
@@ -104,7 +106,8 @@ def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assi
 
 
 def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, smooth, rbf_type,
-                                 assignments_fn, reduce_coeffs=None, progress_bar=None):
+                                 assignments_fn, reduce_coeffs=None, progress_bar=None,
+                                 weight_correspondence_angles=False):
     """
     Estimates a dense warp field that minimizes error of correspondences between ``moving``
     and ``static`` by transforming ``moving``. The correspondences are induced by the given
@@ -129,13 +132,19 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
     static_distances = get_distance_transforms_from_binary_assignments(static_assignments)
     static_directions = get_closest_feature_directions_from_binary_assignments(static_assignments)
 
+    centroids_for_weighting = centroids if weight_correspondence_angles else None
+
     # TODO estimate reverse transform to prevent holes
     def estimate_fn(moving, static, previous_transform):
         if previous_transform is None:
             previous_transform = np.mgrid[:moving.shape[0], :moving.shape[1]]
         moving_memberships = assignments_fn(moving, centroids, intervals)
-        warp_field = calculate_dense_displacements(moving_memberships, static_distances,
-                                                   static_directions, smooth, rbf_type, centroids)
+        warp_field = calculate_dense_displacements(moving_memberships,
+                                                   static_distances,
+                                                   static_directions,
+                                                   smooth,
+                                                   rbf_type,
+                                                   centroids_for_weighting)
 
         if reduce_coeffs:
             dct = dense_displacement_to_dct(warp_field, reduce_coeffs)

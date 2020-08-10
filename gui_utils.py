@@ -57,6 +57,7 @@ class PartialRunConfiguration:
     num_centroids: int = attr.ib(default=None)
     kde_rho: float = attr.ib(default=None)
     assignment_type: str = attr.ib(default=None)
+    weight_correspondence_angles: bool = attr.ib(default=None)
     transform_type: str = attr.ib(default=None)
     rbf_type: str = attr.ib(default=None)
     smoothness: int = attr.ib(default=None)
@@ -145,6 +146,7 @@ RESULTS_SUFFIX = ".results"
 class ParamType(Enum):
     INTERVAL = "interval"
     CATEGORICAL = "categorical"
+    BOOLEAN = "boolean"
 
 
 class VisType(Enum):
@@ -158,6 +160,9 @@ class VisType(Enum):
     RADIO = "radio"
     SELECTBOX = "selectbox"
     MULTISELECT = "multiselect"
+
+    # for boolean params (default: checkbox)
+    CHECKBOX = "checkbox"
 
 
 def _validate_param_type(instance, attribute, value):
@@ -188,10 +193,15 @@ class ParamDescriptor:
 
     @vis_type.validator
     def _validate_vis_type(self, attribute, value):
+        if value == VisType.DEFAULT:
+            return True
+
         if self.param_type == ParamType.INTERVAL:
-            return value in (VisType.DEFAULT, VisType.SLIDER, VisType.NUMBER_INPUT)
+            return value in (VisType.SLIDER, VisType.NUMBER_INPUT)
         elif self.param_type == ParamType.CATEGORICAL:
-            return value in (VisType.DEFAULT, VisType.RADIO, VisType.SELECTBOX)
+            return value in (VisType.RADIO, VisType.SELECTBOX)
+        elif self.param_type == ParamType.BOOLEAN:
+            return value == VisType.CHECKBOX
 
     @property
     def param_dict(self):
@@ -202,6 +212,7 @@ class ParamDescriptor:
             return self.min_value <= result <= self.max_value
         elif self.param_type == ParamType.CATEGORICAL:
             return result in self.options
+        return True
 
 
 def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar, value=None,
@@ -224,6 +235,8 @@ def make_st_widget(descriptor: ParamDescriptor, label: str, target=st.sidebar, v
         elif descriptor.vis_type == VisType.MULTISELECT:
             factory = target.multiselect
             returns_iterable = True
+    elif descriptor.param_type == ParamType.BOOLEAN:
+        factory = target.checkbox
     else:
         raise AttributeError(descriptor)
 

@@ -412,7 +412,10 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
 
     st.image(image=plot_memberships())
 
-# TODO plot assignments
+
+params.weight_correspondence_angles = make_st_widget(conf.WEIGHT_CORRESPONDENCE_ANGLES_DESCRIPTOR,
+                                                     label="weight correspondences on similarity with main direction")
+
 
 '''
 ### Fit a transformation
@@ -461,12 +464,14 @@ def plot_binary_correspondences():
     if picked_angle_index == -1:
         plot_correspondences(moving, static, centroids,
                              moving_assignments if params.assignment_type == 'binary' else moving_memberships,
-                             static_distances, static_directions)
+                             static_distances, static_directions,
+                             weight_correspondence_angles=params.weight_correspondence_angles)
     else:
         plot_correspondences(moving, static, centroids[picked_angle_index, None],
                              moving_assignments[picked_angle_index, None] if params.assignment_type == 'binary'
                              else moving_memberships[picked_angle_index, None],
-                             static_distances[picked_angle_index, None], static_directions[picked_angle_index, None])
+                             static_distances[picked_angle_index, None], static_directions[picked_angle_index, None],
+                             weight_correspondence_angles=params.weight_correspondence_angles)
     plt.title("correspondences from " +
               ("binary assignments" if params.assignment_type == 'binary' else "memberships"))
     plt.tight_layout()
@@ -591,8 +596,10 @@ def load_config_and_show():
         plot_binary_assignments(static_assignments, centroids, ax=axs[1,0])
         axs[1,0].set_title("static assignments")
 
-        plot_correspondences(warped_moving, static, centroids, warped_moving_assignments, static_distances,
-                             static_directions, ax=axs[1,1])
+        plot_correspondences(warped_moving, static, centroids, warped_moving_assignments,
+                             static_distances, static_directions,
+                             weight_correspondence_angles=params.weight_correspondence_angles,
+                             ax=axs[1,1])
         axs[1,1].set_title("warped correspondences")
         # if config.assignment_type == conf.AssignmentType.BINARY:
 
@@ -689,10 +696,8 @@ elif st.sidebar.button("Run calculation"):
     # TODO improve this
     # TODO maybe recompute centroids, intervals etc.?
     results = None
-    common_params = dict(moving=moving, static=static, n_iter=config.num_iterations,
-                         centroids=centroids, intervals=intervals, progress_bar=pbar)
-
     assignment_fn = None
+
     if config.assignment_type == 'binary' and config.filter_method == 'Farid derivative filter':
         assignment_fn = get_binary_assignments_from_centroids
     elif config.assignment_type == 'binary' and config.filter_method == 'Gabor filter':
@@ -702,18 +707,19 @@ elif st.sidebar.button("Run calculation"):
     elif config.assignment_type == 'memberships' and config.filter_method == 'Gabor filter':
         assignment_fn = partial(get_memberships_from_gabor, sigma=config.gabor_filter_sigma)
 
+    common_params = dict(moving=moving, static=static, n_iter=config.num_iterations,
+                         centroids=centroids, intervals=intervals, progress_bar=pbar,
+                         assignments_fn=assignment_fn,
+                         weight_correspondence_angles=config.weight_correspondence_angles)
+
     estimate_fn = None
     if config.transform_type == 'linear transform':
-        estimate_fn = partial(estimate_linear_transform, assignments_fn=assignment_fn,
-                              reg_factor=config.l2_regularization_factor,
-                              **common_params)
+        estimate_fn = partial(estimate_linear_transform, reg_factor=config.l2_regularization_factor)
     elif config.transform_type == 'dense displacement':
-        estimate_fn = partial(estimate_dense_displacements, assignments_fn=assignment_fn,
-                              smooth=config.smoothness, rbf_type=config.rbf_type,
-                              reduce_coeffs=config.num_dct_coeffs,
-                              **common_params)
+        estimate_fn = partial(estimate_dense_displacements, smooth=config.smoothness,
+                              rbf_type=config.rbf_type, reduce_coeffs=config.num_dct_coeffs)
 
-    results = estimate_fn()
+    results = estimate_fn(**common_params)
 
     if results is None:
         st.error("Failed to run config!")

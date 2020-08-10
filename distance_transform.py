@@ -115,10 +115,10 @@ def linear_ramp_membership(x, c_left, c, c_right):
         return 1 - (x-c) / (c_right - c)
 
 
-def get_memberships_from_centroids(image, centroids, intervals):
+def get_memberships_from_centroids(image, centroids, intervals, threshold=0.2):
     angles, magnitudes = get_gradients_in_polar_coords(image)
     memberships = np.zeros((len(centroids), *image.shape))
-    mask = ~np.isclose(magnitudes, 0, atol=0.2)
+    mask = ~np.isclose(magnitudes, 0, atol=threshold)
 
     assert np.all(-np.pi <= centroids) and np.all(centroids <= np.pi)
     assert np.all(-np.pi <= angles) and np.all(angles <= np.pi)
