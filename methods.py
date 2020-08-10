@@ -57,6 +57,9 @@ def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter, pro
             progress_bar.update(1)
             progress_bar.set_postfix(dict(error=result.error, energy=result.energy))
 
+        if np.isnan(result.energy):
+            raise Exception("Energy diverged.")
+
     return results
 
 

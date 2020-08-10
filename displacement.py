@@ -18,6 +18,7 @@ Note that these two arrays require a binary assignment to be generated.
 import attr
 import matplotlib.pyplot as plt
 import numpy as np
+from numexpr import evaluate
 from scipy.sparse.linalg import lsmr
 from scipy.spatial.distance import pdist, squareform, cdist
 from skimage.transform import ProjectiveTransform, warp
@@ -61,12 +62,12 @@ def _rbf_linear(r):
 
 
 def _rbf_multiquadric(r):
-    epsilon = 1
-    return np.sqrt((1. / epsilon * r) ** 2 + 1)
+    eps = 0.1
+    return evaluate("sqrt((1 / eps *r) ** 2 + 1)")
 
 
 def _rbf_thin_plate_splines(r):
-    return r ** 2 * np.log(r)
+    return evaluate("r * log(r**r)")
 
 
 _rbf_type_to_function = {conf.RbfType.LINEAR: _rbf_linear,
