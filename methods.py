@@ -26,7 +26,9 @@ def _get_error(moving, static):
     return np.mean(np.abs(moving - static))
 
 
-def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter, progress_bar=None):
+def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter,
+                               centroids, intervals, assignments_fn, static_distances,
+                               progress_bar=None):
     transform = None
     warped_moving = original_moving.copy()
 
@@ -41,16 +43,11 @@ def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter, pro
         warped_moving[warped_moving > 0.5] = 1
         warped_moving[warped_moving < 0.5] = 0
 
-        # TODO think of a way to better handle energy
-        # TODO HACKED!!!
-        centroids, intervals = get_n_equidistant_angles_and_intervals(4)
-        assignments = get_binary_assignments_from_centroids(warped_moving, centroids, intervals)
-        memberships = get_memberships_from_centroids(warped_moving, centroids, intervals)
-        distances = get_distance_transforms_from_binary_assignments(static)
+        memberships = assignments_fn(warped_moving, centroids, intervals)
 
         result = TransformResult(stacked_transform=transform,
                                  error=_get_error(warped_moving, static),
-                                 energy=get_correspondences_energy(memberships, distances))
+                                 energy=get_correspondences_energy(memberships, static_distances))
         results.append(result)
 
         if progress_bar:
@@ -102,7 +99,9 @@ def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assi
         # we use transform classes from skimage here, they can be concatenated with +
         return transform if previous_transform is None else transform + previous_transform
 
-    return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter, progress_bar)
+    return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter,
+                                      centroids, intervals, assignments_fn,
+                                      static_distances, progress_bar)
 
 
 def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, smooth, rbf_type,
@@ -152,4 +151,6 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
 
         return previous_transform + warp_field
 
-    return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter, progress_bar)
+    return _estimate_warp_iteratively(estimate_fn, moving, static, n_iter,
+                                      centroids, intervals, assignments_fn,
+                                      static_distances, progress_bar)
