@@ -294,7 +294,12 @@ params.response_cutoff_threshold = make_st_widget(conf.RESPONSE_CUTOFF_THRESHOLD
                                                   label="response cutoff")
 
 
+centroids_degrees_and_all = ('-- all --', *centroids_degrees)
+picked_angle = st.selectbox(label='angle for assignments', options=centroids_degrees_and_all)
+picked_angle_index = centroids_degrees_and_all.index(picked_angle) - 1
+
 write_centroid_legend()
+
 
 
 @cache_allow_output_mutation
@@ -302,9 +307,16 @@ def plot_assignments():
     _, axs = plt.subplots(1, 2, figsize=(8, 4))
     moving_assignments = get_binary_assignments(moving, centroids, intervals, threshold=params.response_cutoff_threshold)
     static_assignments = get_binary_assignments(static, centroids, intervals, threshold=params.response_cutoff_threshold)
-    plot_binary_assignments(moving_assignments, centroids, axs[0])
+
+    if picked_angle_index == -1:
+        plot_binary_assignments(moving_assignments, centroids, axs[0])
+        plot_binary_assignments(static_assignments, centroids, axs[1])
+    else:
+        i = picked_angle_index
+        plot_binary_assignments(moving_assignments[i,None], centroids[i, None], axs[0])
+        plot_binary_assignments(static_assignments[i,None], centroids[i, None], axs[1])
+
     axs[0].set_title("moving")
-    plot_binary_assignments(static_assignments, centroids, axs[1])
     axs[1].set_title("static")
 
     return figure_to_image()
@@ -450,7 +462,6 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     plot, the weights are depicted by the transparency of the arrows.
     '''
 
-centroids_degrees_and_all = ('-- all --', *centroids_degrees)
 picked_angle = st.selectbox(label="Choose specific angle", options=centroids_degrees_and_all)
 picked_angle_index = centroids_degrees_and_all.index(picked_angle) - 1
 
