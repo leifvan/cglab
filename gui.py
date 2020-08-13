@@ -355,7 +355,6 @@ def get_static_assignments_distances_directions():
     assignments = get_binary_assignments(static, centroids, intervals, threshold=params.response_cutoff_threshold)
     distances = get_distance_transforms_from_binary_assignments(assignments)
     directions = get_closest_feature_directions_from_binary_assignments(assignments)
-    # directions = get_closest_feature_directions_from_distance_transforms(distances)
     return assignments, distances, directions
 
 
@@ -373,8 +372,8 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     (pixel, angle) pair. This gives the following memberships for each pixel of the moving image:
     '''
 
-    picked_angle = st.selectbox(label='angle', options=centroids_degrees)
-    picked_angle_index = centroids_degrees.index(picked_angle)
+    picked_angle = st.selectbox(label='angle', options=centroids_degrees_and_all)
+    picked_angle_index = centroids_degrees_and_all.index(picked_angle) - 1
 
     write_centroid_legend()
 
@@ -382,9 +381,15 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     @cache_allow_output_mutation
     def plot_memberships():
         plt.figure()
-        color = centroids_colors[picked_angle_index]
         membership_image = np.tile(moving[..., None], reps=(1, 1, 3)) * 0.2
-        membership_image += 0.8 * moving_memberships[picked_angle_index, ..., None] * color
+        if picked_angle_index == -1:
+            for i, color in enumerate(centroids_colors):
+                membership_image[moving_memberships[i] != 0] = 0
+                membership_image += moving_memberships[i, ..., None] * color
+        else:
+            color = centroids_colors[picked_angle_index]
+            membership_image[moving_memberships[picked_angle_index] != 0] = 0
+            membership_image += moving_memberships[picked_angle_index, ..., None] * color
         plt.imshow(membership_image)
         return figure_to_image()
 
