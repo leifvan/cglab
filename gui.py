@@ -370,54 +370,7 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     r'''
     ### Memberships
     Instead of using binary assignments in the moving image, we will use soft-assignments for each
-    (pixel, angle) pair. Let $M_{\phi_k}[i,j]$ be the membership of pixel (i,j) to the k-th main
-    direction $\phi_k$. The membership is a value in [0,1] and is determined as a linear
-    interpolation where $M_\phi[i,j]$ is 0 if the angle $\psi$ at pixel (i,j) is outside the
-    interval $(\phi_{k-1}, \phi_{k+1})$ and 1 if $\psi = \phi_k$. These values are shown in the
-    following plot:
-    
-    '''
-
-
-    @cache_allow_output_mutation
-    def plot_membership_calculation():
-        plt.figure(figsize=(7, 3))
-        centroids_degree_values = -(centroids / np.pi * 180 + 180) % 360
-        sort_idx = np.argsort(centroids_degree_values)
-        centroids_degree_values = centroids_degree_values[sort_idx]
-
-        for i, color in enumerate(centroids_colors[sort_idx]):
-            if i == 0:
-                plt.plot(centroids_degree_values[:2], [1, 0], c=color)
-                plt.fill_between(centroids_degree_values[:2], [1, 0], color=color, alpha=0.05)
-            elif i == len(centroids_colors) - 1:
-                plt.plot([centroids_degree_values[i - 1],
-                          centroids_degree_values[i],
-                          centroids_degree_values[0] + 360], [0, 1, 0], c=color)
-                plt.fill_between([centroids_degree_values[i - 1],
-                                  centroids_degree_values[i],
-                                  centroids_degree_values[0] + 360], [0, 1, 0],
-                                 color=color, alpha=0.05)
-            else:
-                plt.plot(centroids_degree_values[i - 1:i + 2], [0, 1, 0], c=color)
-                plt.fill_between(centroids_degree_values[i - 1:i + 2], [0, 1, 0], color=color, alpha=0.05)
-
-        plt.plot([centroids_degree_values[-1], centroids_degree_values[0] + 360], [0, 1],
-                 c=centroids_colors[sort_idx[0]])
-        plt.fill_between([centroids_degree_values[-1], centroids_degree_values[0] + 360], [0, 1],
-                         color=centroids_colors[sort_idx[0]], alpha=0.05)
-        plt.xticks([*centroids_degree_values, centroids_degree_values[0] + 360],
-                   [f"{cdv:.0f}°" for cdv in [*centroids_degree_values, centroids_degree_values[0] + 360]])
-        plt.xlabel("angle")
-        plt.ylabel("membership")
-        plt.tight_layout()
-        return figure_to_image()
-
-
-    st.image(image=plot_membership_calculation())
-
-    '''
-    This gives the following memberships for each pixel of the moving image:
+    (pixel, angle) pair. This gives the following memberships for each pixel of the moving image:
     '''
 
     picked_angle = st.selectbox(label='angle', options=centroids_degrees)
