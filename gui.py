@@ -20,7 +20,8 @@ from distance_transform import get_binary_assignments_from_centroids, get_distan
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
     get_binary_assignments_from_gabor, get_memberships_from_gabor
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
-    plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
+    plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments, \
+    plot_gabor_filter
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
     RunResult, StreamlitProgressWrapper, PartialRunConfiguration, make_st_widget
 from methods import apply_transform, estimate_linear_transform, estimate_dense_displacements
@@ -293,7 +294,6 @@ elif params.filter_method == conf.FilterMethod.GABOR:
 params.response_cutoff_threshold = make_st_widget(conf.RESPONSE_CUTOFF_THRESHOLD,
                                                   label="response cutoff")
 
-
 centroids_degrees_and_all = ('-- all --', *centroids_degrees)
 picked_angle = st.selectbox(label='angle for assignments', options=centroids_degrees_and_all)
 picked_angle_index = centroids_degrees_and_all.index(picked_angle) - 1
@@ -301,23 +301,38 @@ picked_angle_index = centroids_degrees_and_all.index(picked_angle) - 1
 write_centroid_legend()
 
 
-
 @cache_allow_output_mutation
 def plot_assignments():
-    _, axs = plt.subplots(1, 2, figsize=(8, 4))
-    moving_assignments = get_binary_assignments(moving, centroids, intervals, threshold=params.response_cutoff_threshold)
-    static_assignments = get_binary_assignments(static, centroids, intervals, threshold=params.response_cutoff_threshold)
+    # _, axs = plt.subplots(1, 2, figsize=(8, 4))
+    moving_assignments = get_binary_assignments(moving, centroids, intervals,
+                                                threshold=params.response_cutoff_threshold)
+    static_assignments = get_binary_assignments(static, centroids, intervals,
+                                                threshold=params.response_cutoff_threshold)
 
     if picked_angle_index == -1:
-        plot_binary_assignments(moving_assignments, centroids, axs[0])
-        plot_binary_assignments(static_assignments, centroids, axs[1])
+        plt.figure(figsize=(8, 4))
+        ax1 = plt.subplot(1, 2, 1)
+        ax2 = plt.subplot(1, 2, 2)
+        plot_binary_assignments(moving_assignments, centroids, ax1)
+        plot_binary_assignments(static_assignments, centroids, ax2)
     else:
-        i = picked_angle_index
-        plot_binary_assignments(moving_assignments[i,None], centroids[i, None], axs[0])
-        plot_binary_assignments(static_assignments[i,None], centroids[i, None], axs[1])
+        plt.figure(figsize=(8, 8))
+        ax1 = plt.subplot(2, 2, 1)
+        ax2 = plt.subplot(2, 2, 2)
+        ax3 = plt.subplot(2, 2, 3)
+        ax4 = plt.subplot(2, 2, 4)
 
-    axs[0].set_title("moving")
-    axs[1].set_title("static")
+        i = picked_angle_index
+        plot_binary_assignments(moving_assignments[i, None], centroids[i, None], ax1)
+        plot_binary_assignments(static_assignments[i, None], centroids[i, None], ax2)
+        plot_gabor_filter(centroids[i], params.gabor_filter_sigma, ax=ax3)
+        ax3.set_title("Gabor filter")
+        distances = get_distance_transforms_from_binary_assignments(static_assignments[i,None])
+        ax4.imshow(distances[0], cmap='bone')
+
+    ax1.set_title("moving")
+    ax2.set_title("static")
+
 
     return figure_to_image()
 
@@ -340,7 +355,7 @@ def get_static_assignments_distances_directions():
     assignments = get_binary_assignments(static, centroids, intervals, threshold=params.response_cutoff_threshold)
     distances = get_distance_transforms_from_binary_assignments(assignments)
     directions = get_closest_feature_directions_from_binary_assignments(assignments)
-    #directions = get_closest_feature_directions_from_distance_transforms(distances)
+    # directions = get_closest_feature_directions_from_distance_transforms(distances)
     return assignments, distances, directions
 
 
@@ -423,10 +438,8 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
 
     st.image(image=plot_memberships())
 
-
 params.weight_correspondence_angles = make_st_widget(conf.WEIGHT_CORRESPONDENCE_ANGLES_DESCRIPTOR,
                                                      label="weight correspondences on similarity with main direction")
-
 
 '''
 ### Fit a transformation
@@ -468,19 +481,23 @@ picked_angle_index = centroids_degrees_and_all.index(picked_angle) - 1
 write_centroid_legend()
 
 
-@cache_allow_output_mutation
+#@cache_allow_output_mutation
 def plot_binary_correspondences():
     plt.figure()
+    if params.assignment_type == conf.AssignmentType.BINARY:
+        memberships = moving_assignments
+    elif params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
+        memberships = moving_memberships
+
     if picked_angle_index == -1:
-        plot_correspondences(moving, static, centroids,
-                             moving_assignments if params.assignment_type == 'binary' else moving_memberships,
+        plot_correspondences(moving, static, centroids, memberships,
                              static_distances, static_directions,
                              weight_correspondence_angles=params.weight_correspondence_angles)
     else:
         plot_correspondences(moving, static, centroids[picked_angle_index, None],
-                             moving_assignments[picked_angle_index, None] if params.assignment_type == 'binary'
-                             else moving_memberships[picked_angle_index, None],
-                             static_distances[picked_angle_index, None], static_directions[picked_angle_index, None],
+                             memberships[picked_angle_index, None],
+                             static_distances[picked_angle_index, None],
+                             static_directions[picked_angle_index, None],
                              weight_correspondence_angles=params.weight_correspondence_angles)
     plt.title("correspondences from " +
               ("binary assignments" if params.assignment_type == 'binary' else "memberships"))
@@ -584,36 +601,36 @@ def load_config_and_show():
         _, axs = plt.subplots(2, 3, figsize=(12, 10))
 
         warped_moving = moving if i == 0 else run_result.warped_moving[i - 1]
-        axs[0,0].imshow(get_colored_difference_image(moving, static))
-        axs[0,0].set_title("unwarped")
+        axs[0, 0].imshow(get_colored_difference_image(moving, static))
+        axs[0, 0].set_title("unwarped")
 
         if i > 0:
             if params.transform_type == 'linear transform':
-                plot_projective_transform(run_result.results[i - 1].stacked_transform, ax=axs[0,1])
+                plot_projective_transform(run_result.results[i - 1].stacked_transform, ax=axs[0, 1])
             elif params.transform_type == 'dense displacement':
                 local_transform = run_result.results[i - 1].stacked_transform - np.mgrid[:moving.shape[0],
                                                                                 :moving.shape[1]]
-                plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[0,1])
-        axs[0,1].set_title("estimated transform")
+                plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[0, 1])
+        axs[0, 1].set_title("estimated transform")
 
-        axs[0,2].imshow(get_colored_difference_image(warped_moving, static))
-        axs[0,2].set_title("warped")
+        axs[0, 2].imshow(get_colored_difference_image(warped_moving, static))
+        axs[0, 2].set_title("warped")
 
         # SECOND ROW
         warped_moving_assignments = get_binary_assignments(warped_moving, centroids, intervals,
                                                            threshold=config.response_cutoff_threshold)
 
-        plot_binary_assignments(static_assignments, centroids, ax=axs[1,0])
-        axs[1,0].set_title("static assignments")
+        plot_binary_assignments(static_assignments, centroids, ax=axs[1, 0])
+        axs[1, 0].set_title("static assignments")
 
         plot_correspondences(warped_moving, static, centroids, warped_moving_assignments,
                              static_distances, static_directions,
                              weight_correspondence_angles=params.weight_correspondence_angles,
-                             ax=axs[1,1])
-        axs[1,1].set_title("warped correspondences")
+                             ax=axs[1, 1])
+        axs[1, 1].set_title("warped correspondences")
         # if config.assignment_type == conf.AssignmentType.BINARY:
 
-        plot_binary_assignments(warped_moving_assignments, centroids, ax=axs[1,2])
+        plot_binary_assignments(warped_moving_assignments, centroids, ax=axs[1, 2])
         # TODO plot memberships somehow
         # elif config.assignment_type == conf.AssignmentType.MEMBERSHIPS:
         #     warped_moving_memberships = get_memberships(warped_moving, centroids, intervals,

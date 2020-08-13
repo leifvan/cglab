@@ -8,6 +8,7 @@ from gradient_directions import get_gradients_in_polar_coords, apply_gabor_filte
 def assert_assignments_binary(fn):
     def _assert_assignments_binary(image, centroids, intervals, **kwargs):
         assignments = fn(image, centroids, intervals, **kwargs)
+        assert np.all((assignments == 1) | (assignments == 0))
         assert np.all(assignments.sum(axis=0) <= 1)
         return assignments
 

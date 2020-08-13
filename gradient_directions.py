@@ -153,6 +153,12 @@ def apply_gabor_filters(image, centroids, sigma):
 # PLOT FUNCTIONS
 # --------------
 
+def plot_gabor_filter(angle, sigma, ax=None):
+    filter = -get_gabor_filter(angle, sigma)
+    ax = ax or plt.gca()
+    ax.imshow(filter, cmap='bone')
+
+
 def plot_polar_gradients(angles, magnitudes, ax=None):
     ax = ax or plt.gca()
     vis = np.zeros((*angles.shape, 3))

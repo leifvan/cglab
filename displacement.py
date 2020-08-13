@@ -147,7 +147,7 @@ def plot_correspondences(moving, static, centroids, memberships, distances, dire
     aa = c.aa
     yy, xx, uu, vv = c.get_yxuv()
     colors = angle_to_rgb(centroids[aa], with_alpha=True)
-    colors[:, 3] = c.weights * 0.5
+    colors[:, 3] = c.weights * 0.8
 
     base_difference = get_colored_difference_image(moving, static)
 
