@@ -140,11 +140,11 @@ def degaussify_colors(image, lut):
     n_channels = image.shape[2]
     assert n_channels in (1, 3)
 
-    image = np.zeros_like(image)
+    degaussified = np.zeros_like(image)
     for c in range(n_channels):
-        image[..., c] = lut[image[..., c], c]
+        degaussified[..., c] = lut[image[..., c], c]
 
-    return image
+    return degaussified
 
 
 def histogram_preserved_blending(patch1, patch2, lamb):
@@ -205,7 +205,7 @@ if __name__ == '__main__':
     plt.imshow(recorrelated)
     plt.show()
 
-    print(np.linalg.norm(image - recorrelated))  # result is < 1580
+    assert np.linalg.norm(image - recorrelated) < 1580
 
     patch1 = image[300:500, 100:300]
     patch2 = image[700:900, 300:500]
