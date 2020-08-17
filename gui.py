@@ -686,15 +686,19 @@ def load_config_and_show():
         for c in range(texture.shape[2]):
             moving_texture[..., c] = apply_transform(moving_texture[..., c],
                                                      transform,
-                                                     mode='reflect')
+                                                     mode='reflect',
+                                                     order=2)
 
         moving_texture = moving_texture[conf.PADDING_SIZE:-conf.PADDING_SIZE,
                                         conf.PADDING_SIZE:-conf.PADDING_SIZE].astype(np.uint8)
         static_texture = texture[window_slice]
-        # blended_texture = histogram_preserved_blending(moving_texture,
-        #                                                static_texture,
-        #                                                0.5)
-        blended_texture = (0.5 * moving_texture + 0.5 * static_texture).astype(np.uint8)
+        lamb = 0.5
+        #lamb = np.linspace(1,0,num=conf.PATCH_SIZE)[None,:,None]
+        blended_texture = histogram_preserved_blending(moving_texture,
+                                                       static_texture,
+                                                       lamb)
+        #blended_texture = np.max(np.array([moving_texture, static_texture]), axis=0)
+        #blended_texture = (0.5 * moving_texture + 0.5 * static_texture).astype(np.uint8)
 
         axs[0].imshow(moving_texture * mask[...,None], vmin=0, vmax=255)
         axs[1].imshow(blended_texture * mask[...,None], vmin=0, vmax=255)
