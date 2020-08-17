@@ -61,6 +61,7 @@ class PartialRunConfiguration:
     assignment_type: str = attr.ib(default=None)
     weight_correspondence_angles: bool = attr.ib(default=None)
     transform_type: str = attr.ib(default=None)
+    linear_transform_type:str = attr.ib(default=None)
     rbf_type: str = attr.ib(default=None)
     smoothness: int = attr.ib(default=None)
     l2_regularization_factor: float = attr.ib(default=None)

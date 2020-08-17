@@ -65,6 +65,15 @@ class TransformType(ValueIterEnum):
 TRANSFORM_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=TransformType.values())
 
 
+class LinearTransformType(ValueIterEnum):
+    TRANSPOSITION = 'transposition'
+    AFFINE = 'affine'
+    PROJECTIVE = 'projective'
+
+
+LINEAR_TRANSFORM_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=LinearTransformType.values())
+
+
 class RbfType(ValueIterEnum):
     LINEAR = 'linear'
     MULTIQUADRIC = 'multiquadric'
@@ -97,6 +106,8 @@ PARAM_DESCRIPTOR_MAP = OrderedDict(downscale_factor=DOWNSCALE_FACTOR_DESCRIPTOR,
                                    kde_rho=KDE_RHO_DESCRIPTOR,
                                    assignment_type=ASSIGNMENT_TYPE_DESCRIPTOR,
                                    transform_type=TRANSFORM_TYPE_DESCRIPTOR,
+                                   linear_transform_type=LINEAR_TRANSFORM_TYPE_DESCRIPTOR,
+                                   rbf_type=RBF_TYPE_DESCRIPTOR,
                                    smoothness=SMOOTHNESS_DESCRIPTOR,
                                    l2_regularization_factor=L2_REGULARIZATION_FACTOR_DESCRIPTOR,
                                    num_dct_coeffs=NUM_DCT_COEFFS_DESCRIPTOR,

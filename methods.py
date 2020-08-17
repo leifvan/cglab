@@ -61,7 +61,8 @@ def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter,
 
 
 def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assignments_fn,
-                              reg_factor=0., progress_bar=None, weight_correspondence_angles=False):
+                              reg_factor, ttype, progress_bar=None,
+                              weight_correspondence_angles=False):
     """
     Estimates a projective transform that minimizes error of correspondences between ``moving``
     and ``static`` by transforming ``moving``. The correspondences are induced by the given
@@ -77,7 +78,9 @@ def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assi
         :func:`distance_transform.get_binary_assignments_from_centroids`.
     :param reg_factor: An optional factor for regularizing the least squares solution. See
         parameter ``damp`` in :func:`scipy.sparse.linalg.lsmr` for details.
+    :param ttype: # FIXME missing docstring
     :param progress_bar: An optional progress_bar to report progress to.
+    :param weight_correspondence_angles: # FIXME missing docstring
     :return: A list of :class:`TransformResult` objects containing the results of each iteration.
     """
     # TODO previously we used the whole image for that to also be aware of the surroundings
@@ -95,6 +98,7 @@ def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assi
                                                         static_distances,
                                                         static_directions,
                                                         reg_factor,
+                                                        ttype,
                                                         centroids_for_weighting)
         # we use transform classes from skimage here, they can be concatenated with +
         return transform if previous_transform is None else transform + previous_transform

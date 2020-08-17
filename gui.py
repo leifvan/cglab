@@ -495,6 +495,10 @@ if params.transform_type == conf.TransformType.LINEAR:
     \end{pmatrix}
     $$
     '''
+    params.linear_transform_type = make_st_widget(conf.LINEAR_TRANSFORM_TYPE_DESCRIPTOR,
+                                                  label='linear transform type',
+                                                  value=config.linear_transform_type)
+
     params.l2_regularization_factor = make_st_widget(conf.L2_REGULARIZATION_FACTOR_DESCRIPTOR,
                                                      label="L2 regularization",
                                                      value=config.l2_regularization_factor)
@@ -741,7 +745,8 @@ elif st.sidebar.button("Run calculation"):
 
     estimate_fn = None
     if config.transform_type == 'linear transform':
-        estimate_fn = partial(estimate_linear_transform, reg_factor=config.l2_regularization_factor)
+        estimate_fn = partial(estimate_linear_transform, reg_factor=config.l2_regularization_factor,
+                              ttype=config.linear_transform_type)
     elif config.transform_type == 'dense displacement':
         estimate_fn = partial(estimate_dense_displacements, smooth=config.smoothness,
                               rbf_type=config.rbf_type, reduce_coeffs=config.num_dct_coeffs)

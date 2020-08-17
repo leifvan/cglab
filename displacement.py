@@ -25,6 +25,12 @@ from skimage.transform import ProjectiveTransform, warp
 
 import gui_config as conf
 from utils import get_colored_difference_image, angle_to_rgb
+from gui_config import LinearTransformType
+
+
+TTYPE_TO_INDICES = {LinearTransformType.TRANSPOSITION: (2,5),
+                    LinearTransformType.AFFINE: (0,1,2,3,4,5),
+                    LinearTransformType.PROJECTIVE: None}
 
 
 @attr.s(frozen=True)
@@ -178,7 +184,7 @@ def get_correspondences_energy(memberships, distances):
     return weighted_distances.sum() / memberships.sum()
 
 
-def estimate_projective_transform(c, reg_factor=0.):
+def estimate_projective_transform(c, reg_factor=0., select_params=None):
     """
     Estimates an optimal projective transform (in the least-squares sense) given n correspondences
     from ``src`` to ``dst``, i.e. every pair ``(src[i], dst[i])`` is a correspondence. The pairs
@@ -190,6 +196,8 @@ def estimate_projective_transform(c, reg_factor=0.):
         ``None``, all correspondences are equally weighted.
     :param reg_factor: An optional factor for regularizing the least squares solution. See
         parameter ``damp`` in :func:`scipy.sparse.linalg.lsmr` for details.
+    :param select_params: A list of indices for transformation parameters to use. If ``None``, all
+        parameters are used.
     :return: An ``skimage.transform.ProjectiveTransform`` instance that describes an optimal
         projective transform from ``src`` to ``dst`` points.
     """
@@ -217,11 +225,16 @@ def estimate_projective_transform(c, reg_factor=0.):
     a[n:, 7] = -src[:, 0] * dst[:, 0]
     a[n:] *= sqrt_weights[..., None]
 
-    # damp is the lambda of Tikhonov regularization
-    x = lsmr(a, b, damp=reg_factor)[0]
+    if select_params is None:
+        select_params = (0,1,2,3,4,5,6,7)
 
-    mat = np.array([*x, 0]).reshape((3, 3))
-    mat += np.eye(3)
+    # damp is the lambda of Tikhonov regularization
+    x = lsmr(a[:,select_params], b, damp=reg_factor)[0]
+
+    mat = np.zeros(9)
+    mat[...,select_params] = x
+    mat = np.reshape(mat, (3,3)) + np.eye(3)
+
     return ProjectiveTransform(matrix=mat)
 
 
@@ -235,7 +248,8 @@ def plot_projective_transform(transform, ax=None):
     ax.imshow(0.8 * warped - 0.2 * unwarped, cmap='bone_r', vmin=0, vmax=1)
 
 
-def estimate_transform_from_memberships(memberships, distances, directions, reg_factor=0., centroids=None):
+def estimate_transform_from_memberships(memberships, distances, directions, reg_factor=0.,
+                                        ttype=conf.LinearTransformType.PROJECTIVE, centroids=None):
     """
     Estimates a projective transform based on the correspondences inferred by the given arrays.
     More specifically, each non-null value in ``memberships`` is considered an edge-pixel of a
@@ -256,8 +270,13 @@ def estimate_transform_from_memberships(memberships, distances, directions, reg_
         directions[k, i, j] is the angle from [i,j] to the next edge pixel with angle k.
     :param reg_factor: An optional factor for regularizing the least squares solution. See
         parameter ``damp`` in :func:`scipy.sparse.linalg.lsmr` for details.
+    :param ttype: # FIXME missing docstring
+    :param centroids: An array (n_angles,) of main directions. If given, the correspondences will
+        be weighted w.r.t. the angle similarity of the correspondence vector and the main
+        direction it originated from. If ``None``, no such weighting is applied.
     :return: An ``skimage.transform.ProjectiveTransform`` instance that describes an optimal
         projective transform (in the least-squares sense) of the inferred correspondences.
     """
     correspondences = Correspondences.from_memberships(memberships, distances, directions, centroids)
-    return estimate_projective_transform(correspondences, reg_factor=reg_factor)
+    indices = TTYPE_TO_INDICES[ttype]
+    return estimate_projective_transform(correspondences, reg_factor=reg_factor, select_params=indices)
