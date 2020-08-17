@@ -47,7 +47,7 @@ class Correspondences:
         if centroids is not None:
             centroids_cartesian = np.array([np.sin(centroids), np.cos(centroids)])
             similarity = np.sum(angles_cartesian * centroids_cartesian[:, aa], axis=0)
-            weights *= np.clip(similarity, 0., 1.)
+            weights *= np.abs(similarity)#np.clip(similarity, 0., 1.)
 
         return cls(src=src, dst=dst, weights=weights, aa=aa)
 
