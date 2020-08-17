@@ -9,7 +9,7 @@ from gradient_directions import get_n_equidistant_angles_and_intervals
 from utils import TransformResult
 
 
-def apply_transform(moving, transform):
+def apply_transform(moving, transform, **kwargs):
     """
     Applies a linear or dense transformation to ``moving``.
 
@@ -19,7 +19,7 @@ def apply_transform(moving, transform):
         transforms.
     :return: The transformation result, a 2D-image of the same dimensions as ``moving``.
     """
-    return skimage.transform.warp(moving, transform)
+    return skimage.transform.warp(moving, transform, **kwargs)
 
 
 def _get_error(moving, static):
