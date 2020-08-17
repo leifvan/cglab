@@ -4,6 +4,7 @@ from pathlib import Path
 from gui_utils import ParamDescriptor, ValueIterEnum, ParamType, VisType, PartialRunConfiguration
 
 FEATURE_MAP_DIR = Path("data/feature_maps")
+TEXTURE_DIR = Path("data/textures")
 
 PATCH_SIZE = 80
 PADDING_SIZE = 10

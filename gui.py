@@ -27,6 +27,7 @@ from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, 
 from methods import apply_transform, estimate_linear_transform, estimate_dense_displacements
 from patches import find_promising_patch_pairs
 from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
+from blending import histogram_preserved_blending
 
 cache_allow_output_mutation = partial(st.cache, allow_output_mutation=True)
 
@@ -49,7 +50,8 @@ if st.sidebar.button("load config"):
 
 st.sidebar.markdown("---")
 
-feature_map_paths = conf.FEATURE_MAP_DIR.glob("*.png")
+feature_map_paths = list(conf.FEATURE_MAP_DIR.glob("*.png"))
+texture_path_dict = {p.name: conf.TEXTURE_DIR / p.name for p in feature_map_paths}
 params.feature_map_path = st.sidebar.selectbox("Choose a feature map",
                                                options=[p.name for p in feature_map_paths])
 
@@ -327,12 +329,11 @@ def plot_assignments():
         plot_binary_assignments(static_assignments[i, None], centroids[i, None], ax2)
         plot_gabor_filter(centroids[i], params.gabor_filter_sigma, ax=ax3)
         ax3.set_title("Gabor filter")
-        distances = get_distance_transforms_from_binary_assignments(static_assignments[i,None])
+        distances = get_distance_transforms_from_binary_assignments(static_assignments[i, None])
         ax4.imshow(distances[0], cmap='bone')
 
     ax1.set_title("moving")
     ax2.set_title("static")
-
 
     return figure_to_image()
 
@@ -439,7 +440,7 @@ picked_angle_index = centroids_degrees_and_all.index(picked_angle) - 1
 write_centroid_legend()
 
 
-#@cache_allow_output_mutation
+# @cache_allow_output_mutation
 def plot_binary_correspondences():
     plt.figure()
     if params.assignment_type == conf.AssignmentType.BINARY:
@@ -660,6 +661,47 @@ def load_config_and_show():
             'energy': [r.energy for r in run_result.results]})
         altair_chart = alt.Chart(energy_df).mark_line().encode(x='iteration', y='energy', )
         st.altair_chart(altair_chart, use_container_width=True)
+
+    "### Final blending result"
+
+    def get_blend_plot():
+        _, axs = plt.subplots(1, 3, figsize=(9, 4))
+        texture_path = texture_path_dict[config.feature_map_path]
+        texture = imageio.imread(texture_path)[..., :3]
+        texture = skimage.transform.downscale_local_mean(texture, (config.downscale_factor,
+                                                                   config.downscale_factor,1)).astype(np.uint8)
+
+        transform = run_result.results[-1].stacked_transform
+        padded_patch_slice = pad_slices(patch_slice, conf.PADDING_SIZE)
+        moving_texture = texture[padded_patch_slice].astype(np.float64)
+
+        mask = apply_transform(np.ones(moving_texture.shape[:2]), transform).astype(np.uint8)
+        mask = mask[conf.PADDING_SIZE:-conf.PADDING_SIZE,
+                    conf.PADDING_SIZE:-conf.PADDING_SIZE]
+
+        for c in range(texture.shape[2]):
+            moving_texture[..., c] = apply_transform(moving_texture[..., c],
+                                                     transform,
+                                                     mode='reflect')
+
+        moving_texture = moving_texture[conf.PADDING_SIZE:-conf.PADDING_SIZE,
+                                        conf.PADDING_SIZE:-conf.PADDING_SIZE].astype(np.uint8)
+        static_texture = texture[window_slice]
+        # blended_texture = histogram_preserved_blending(moving_texture,
+        #                                                static_texture,
+        #                                                0.5)
+        blended_texture = (0.5 * moving_texture + 0.5 * static_texture).astype(np.uint8)
+
+        axs[0].imshow(moving_texture * mask[...,None], vmin=0, vmax=255)
+        axs[1].imshow(blended_texture * mask[...,None], vmin=0, vmax=255)
+        axs[2].imshow(static_texture * mask[...,None], vmin=0, vmax=255)
+        axs[0].set_title("warped source")
+        axs[1].set_title("blend")
+        axs[2].set_title("target")
+        plt.tight_layout()
+        return figure_to_image()
+
+    st.image(get_blend_plot(), use_column_width=True)
 
 
 if config in configs:

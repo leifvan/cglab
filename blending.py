@@ -165,7 +165,8 @@ def histogram_preserved_blending(patch1, patch2, lamb):
         values in [0, 255].
     """
     assert np.all((lamb >= 0) & (lamb <= 1))
-
+    assert np.issubdtype(patch1.dtype, np.uint8)
+    assert np.issubdtype(patch2.dtype, np.uint8)
     d_params = get_decorrelation_params(patch1)
 
     patches = [patch1, patch2]
@@ -183,7 +184,7 @@ if __name__ == '__main__':
     import imageio
     import matplotlib.pyplot as plt
 
-    image = imageio.imread("data/cobblestone_floor_03_diff_1k.png")[..., :3]
+    image = imageio.imread("data/textures/cobblestone_floor_03.png")[..., :3]
     plt.imshow(image)
     plt.show()
 
@@ -207,8 +208,9 @@ if __name__ == '__main__':
 
     assert np.linalg.norm(image - recorrelated) < 1580
 
-    patch1 = image[300:500, 100:300]
-    patch2 = image[700:900, 300:500]
+    p1s, p2s = np.random.randint(0, 700, size=(2, 2))
+    patch1 = image[p1s[0]:p1s[0] + 200, p1s[1]:p1s[1] + 200]
+    patch2 = image[p2s[0]:p2s[0] + 200, p2s[1]:p2s[1] + 200]
     blend_linear = (0.5 * patch1 + 0.5 * patch2).astype(np.int)
     blend_hp = histogram_preserved_blending(patch1, patch2, 0.5)
 
