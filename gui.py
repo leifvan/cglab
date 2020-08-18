@@ -681,16 +681,18 @@ if config in configs:
 
     load_config_and_show()
 
-elif st.sidebar.button("Run calculation"):
-
-    pbar = StreamlitProgressWrapper(total=config.num_iterations)
-    results = run_config(config, pbar)
-
-    if results is None:
-        st.error("Failed to run config!")
-    else:
-        configs.append(config)
-        load_config_and_show()
-
 else:
-    st.info("Click 'Run calculation' in the sidebar to get results.")
+    button_slot = st.sidebar.empty()
+    if button_slot.button("Run calculation"):
+        pbar = StreamlitProgressWrapper(total=config.num_iterations)
+        results = run_config(config, pbar)
+
+        if results is None:
+            st.error("Failed to run config!")
+            button_slot.text("Run failed.")
+        else:
+            configs.append(config)
+            button_slot.text("Calculation done.")
+            load_config_and_show()
+    else:
+        st.info("Click 'Run calculation' in the sidebar to get results.")
