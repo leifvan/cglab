@@ -28,6 +28,7 @@ from methods import apply_transform, estimate_linear_transform, estimate_dense_d
 from patches import find_promising_patch_pairs
 from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
 from blending import histogram_preserved_blending
+from gui_plotting import plot_centroids_intervals_polar, plot_multiple_binary_assignments, plot_memberships
 
 cache_allow_output_mutation = partial(st.cache, allow_output_mutation=True)
 
@@ -125,11 +126,9 @@ elif params.transform_type == conf.TransformType.DENSE:
                                            label="spectral coefficients per axis",
                                            value=config.num_dct_coeffs)
 
-
 params.num_iterations = make_st_widget(conf.NUM_ITERATIONS_DESCRIPTOR,
                                        label="number of iterations",
                                        value=config.num_iterations)
-
 
 # ++++++++++++++
 #   MAIN PAGE
@@ -308,29 +307,13 @@ def get_kde_plot_data():
 
 @cache_allow_output_mutation
 def plot_angles():
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='polar')
-
-    ax.set_xlim(-np.pi, np.pi)
-    ax.set_xticks(centroids)
-    ax.set_xticklabels(centroids_degrees)
-
-    for angle, (ilow, ihigh), color in zip(centroids, intervals, centroids_colors):
-        ax.plot([angle, angle], [0, 1], c=color)
-        if ilow > ihigh:
-            ihigh += 2 * np.pi
-        ax.fill_between(np.linspace(ilow, ihigh, num=3), 0, 2, color=color, alpha=0.1)
-
-    ax.set_ylim(0, 1)
-    ax.set_yticks([])
-    ax.set_theta_zero_location('W')
-    ax.set_theta_direction(-1)
-
-    if params.centroid_method == 'histogram clustering':
+    if params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
         sample_points, scores = get_kde_plot_data()
-        ax.plot(sample_points, scores)
-        ax.set_ylim(0, scores.max())
+    else:
+        sample_points = scores = None
 
+    plot_centroids_intervals_polar(centroids, intervals, centroids_degrees,
+                                   centroids_colors, sample_points, scores)
     return figure_to_image()
 
 
@@ -351,46 +334,6 @@ elif params.filter_method == conf.FilterMethod.GABOR:
 centroids_degrees_and_all = ('-- all --', *centroids_degrees)
 picked_angle = st.selectbox(label='angle for assignments', options=centroids_degrees_and_all)
 picked_angle_index = centroids_degrees_and_all.index(picked_angle) - 1
-
-write_centroid_legend()
-
-
-@cache_allow_output_mutation
-def plot_assignments():
-    # _, axs = plt.subplots(1, 2, figsize=(8, 4))
-    moving_assignments = get_binary_assignments(moving, centroids, intervals,
-                                                threshold=params.response_cutoff_threshold)
-    static_assignments = get_binary_assignments(static, centroids, intervals,
-                                                threshold=params.response_cutoff_threshold)
-
-    if picked_angle_index == -1:
-        plt.figure(figsize=(8, 4))
-        ax1 = plt.subplot(1, 2, 1)
-        ax2 = plt.subplot(1, 2, 2)
-        plot_binary_assignments(moving_assignments, centroids, ax1)
-        plot_binary_assignments(static_assignments, centroids, ax2)
-    else:
-        plt.figure(figsize=(8, 8))
-        ax1 = plt.subplot(2, 2, 1)
-        ax2 = plt.subplot(2, 2, 2)
-        ax3 = plt.subplot(2, 2, 3)
-        ax4 = plt.subplot(2, 2, 4)
-
-        i = picked_angle_index
-        plot_binary_assignments(moving_assignments[i, None], centroids[i, None], ax1)
-        plot_binary_assignments(static_assignments[i, None], centroids[i, None], ax2)
-        plot_gabor_filter(centroids[i], params.gabor_filter_sigma, ax=ax3)
-        ax3.set_title("Gabor filter")
-        distances = get_distance_transforms_from_binary_assignments(static_assignments[i, None])
-        ax4.imshow(distances[0], cmap='bone')
-
-    ax1.set_title("moving")
-    ax2.set_title("static")
-
-    return figure_to_image()
-
-
-st.image(image=plot_assignments(), use_column_width=True)
 
 
 @cache_allow_output_mutation
@@ -413,8 +356,19 @@ def get_static_assignments_distances_directions():
 
 static_assignments, static_distances, static_directions = get_static_assignments_distances_directions()
 
-if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
+write_centroid_legend()
 
+
+@cache_allow_output_mutation
+def plot_assignments():
+    plot_multiple_binary_assignments((moving_assignments, static_assignments), centroids,
+                                     picked_angle_index, ('moving', 'static'))
+    return figure_to_image()
+
+
+st.image(image=plot_assignments(), use_column_width=True)
+
+if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
     r'''
     ### Memberships
     Instead of using binary assignments in the moving image, we will use soft-assignments for each
@@ -428,27 +382,16 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
 
 
     @cache_allow_output_mutation
-    def plot_memberships():
-        plt.figure()
-        membership_image = np.tile(moving[..., None], reps=(1, 1, 3)) * 0.2
-        if picked_angle_index == -1:
-            for i, color in enumerate(centroids_colors):
-                membership_image[moving_memberships[i] != 0] = 0
-                membership_image += moving_memberships[i, ..., None] * color
-        else:
-            color = centroids_colors[picked_angle_index]
-            membership_image[moving_memberships[picked_angle_index] != 0] = 0
-            membership_image += moving_memberships[picked_angle_index, ..., None] * color
-        plt.imshow(membership_image)
+    def plot_memberships_fn():
+        plot_memberships(moving, moving_memberships, centroids_colors, picked_angle_index)
         return figure_to_image()
 
 
-    st.image(image=plot_memberships())
+    st.image(image=plot_memberships_fn())
 
 '''
 ### Fit a transformation
 '''
-
 
 transform_type_to_name = {conf.TransformType.LINEAR: 'projective transformation',
                           conf.TransformType.DENSE: 'dense displacement map'}
@@ -488,8 +431,10 @@ def plot_binary_correspondences():
     plt.figure()
     if params.assignment_type == conf.AssignmentType.BINARY:
         memberships = moving_assignments
+        name = "binary assignments"
     elif params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
         memberships = moving_memberships
+        name = "memberships"
 
     if picked_angle_index == -1:
         plot_correspondences(moving, static, centroids, memberships,
@@ -501,8 +446,7 @@ def plot_binary_correspondences():
                              static_distances[picked_angle_index, None],
                              static_directions[picked_angle_index, None],
                              weight_correspondence_angles=params.weight_correspondence_angles)
-    plt.title("correspondences from " +
-              ("binary assignments" if params.assignment_type == 'binary' else "memberships"))
+    plt.title(f"correspondences from {name}")
     plt.tight_layout()
     return figure_to_image()
 
@@ -552,7 +496,6 @@ elif params.transform_type == conf.TransformType.DENSE:
     where 
     '''
 
-
 transform_dof = None
 if params.transform_type == conf.TransformType.LINEAR:
     transform_dof = 8
@@ -562,7 +505,7 @@ elif params.transform_type == conf.TransformType.DENSE:
     else:
         transform_dof = 2 * (params.num_dct_coeffs ** 2)
 
-#st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
+# st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
 
 
 '''
