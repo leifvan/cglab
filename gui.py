@@ -122,7 +122,7 @@ elif params.transform_type == conf.TransformType.DENSE:
                                        label="warp field smoothness",
                                        value=config.smoothness)
     params.num_dct_coeffs = make_st_widget(conf.NUM_DCT_COEFFS_DESCRIPTOR,
-                                           label="spectral coefficients",
+                                           label="spectral coefficients per axis",
                                            value=config.num_dct_coeffs)
 
 
