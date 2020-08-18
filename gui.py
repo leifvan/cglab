@@ -22,11 +22,11 @@ from distance_transform import get_binary_assignments_from_centroids, get_distan
     get_binary_assignments_from_gabor, get_memberships_from_gabor
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
-from gui_config import RunResult, PartialRunConfiguration, make_st_widget
+from gui_config import PartialRunConfiguration, make_st_widget
 from gui_plotting import plot_centroids_intervals_polar, plot_multiple_binary_assignments, plot_memberships
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
     StreamlitProgressWrapper, load_and_preprocess_feature_map, get_padded_moving_and_static, run_config
-from methods import apply_transform, estimate_linear_transform, estimate_dense_displacements
+from methods import apply_transform
 from patches import find_promising_patch_pairs
 from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
 
@@ -514,8 +514,9 @@ def load_config_and_show():
                                                    max_value=config.num_iterations,
                                                    value=config.num_iterations, step=1,
                                                    key="result_index_slider_initial")
-
-    run_animate = st.button("Animate")
+    animate_button_slot = st.empty()
+    stop_button_slot = st.empty()
+    run_animate = animate_button_slot.button("Animate")
 
     @cache_allow_output_mutation
     def show_result(i):
@@ -565,6 +566,7 @@ def load_config_and_show():
     result_diff_placeholder = st.empty()
 
     if run_animate:
+        stop_button_slot.button("Stop")
         for i in range(0, config.num_iterations + 1, 1 + config.num_iterations // 50):
             start_time = time.time()
             result_diff_placeholder.image(image=show_result(i), use_column_width=True)
@@ -576,6 +578,7 @@ def load_config_and_show():
                                                        max_value=config.num_iterations,
                                                        value=config.num_iterations, step=1,
                                                        key="result_index_slider_post_animate")
+        stop_button_slot.empty()
 
     result_diff_placeholder.image(image=show_result(result_index), use_column_width=True)
 
@@ -651,11 +654,12 @@ def load_config_and_show():
                          conf.PADDING_SIZE:-conf.PADDING_SIZE].astype(np.uint8)
         static_texture = texture[window_slice]
         lamb = 0.5
-        # lamb = np.linspace(1,0,num=conf.PATCH_SIZE)[None,:,None]
+        lamb = np.linspace(1,0,num=conf.PATCH_SIZE)[None,:,None]
         blended_texture = histogram_preserved_blending(moving_texture,
                                                        static_texture,
                                                        lamb)
-        # blended_texture = np.max(np.array([moving_texture, static_texture]), axis=0)
+        #blended_texture = np.max(np.array([moving_texture, static_texture]), axis=0)
+        #blended_texture = np.min(np.array([moving_texture, static_texture]), axis=0)
         # blended_texture = (0.5 * moving_texture + 0.5 * static_texture).astype(np.uint8)
 
         axs[0].imshow(moving_texture * mask[..., None], vmin=0, vmax=255)
