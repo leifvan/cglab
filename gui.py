@@ -15,20 +15,20 @@ import skimage.transform
 import streamlit as st
 
 import gui_config as conf
+from blending import histogram_preserved_blending
 from displacement import plot_correspondences, get_correspondences_energy, plot_projective_transform
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
     get_binary_assignments_from_gabor, get_memberships_from_gabor
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
-    plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments, \
-    plot_gabor_filter
+    plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
+from gui_config import RunResult, PartialRunConfiguration, make_st_widget
+from gui_plotting import plot_centroids_intervals_polar, plot_multiple_binary_assignments, plot_memberships
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
-    RunResult, StreamlitProgressWrapper, PartialRunConfiguration, make_st_widget
+    StreamlitProgressWrapper, load_and_preprocess_feature_map, get_padded_moving_and_static, run_config
 from methods import apply_transform, estimate_linear_transform, estimate_dense_displacements
 from patches import find_promising_patch_pairs
 from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
-from blending import histogram_preserved_blending
-from gui_plotting import plot_centroids_intervals_polar, plot_multiple_binary_assignments, plot_memberships
 
 cache_allow_output_mutation = partial(st.cache, allow_output_mutation=True)
 
@@ -63,6 +63,7 @@ params.downscale_factor = make_st_widget(conf.DOWNSCALE_FACTOR_DESCRIPTOR,
                                          label="downscale factor",
                                          value=config.downscale_factor)
 
+# FIXME this is now hacked, because this just generates origins, see below
 params.patch_position = make_st_widget(conf.PATCH_POSITION_DESCRIPTOR,
                                        label="index of the patch pair to choose",
                                        value=config.patch_position)
@@ -141,17 +142,7 @@ params.num_iterations = make_st_widget(conf.NUM_ITERATIONS_DESCRIPTOR,
 
 @cache_allow_output_mutation
 def get_feature_map():
-    feature_map = imageio.imread(conf.FEATURE_MAP_DIR / params.feature_map_path).astype(np.float32)
-
-    if len(feature_map.shape) == 3:
-        feature_map = np.mean(feature_map, axis=2)
-
-    feature_map = skimage.transform.downscale_local_mean(feature_map, (params.downscale_factor,
-                                                                       params.downscale_factor))
-    feature_map /= feature_map.max()
-    feature_map[feature_map > 0.5] = 1
-    feature_map[feature_map < 0.5] = 0
-    return feature_map
+    return load_and_preprocess_feature_map(conf.FEATURE_MAP_DIR / params.feature_map_path, params.downscale_factor)
 
 
 feature_map = get_feature_map()
@@ -185,16 +176,15 @@ def get_patch_pairs():
 
 
 patch_pairs = get_patch_pairs()
+# FIXME this is hacked, it should be that the gui only sets the origins
 patch_slice, window_slice, _ = patch_pairs[conf.NUM_PATCH_PAIRS - params.patch_position]
+params.moving_slices = patch_slice
+params.static_slices = window_slice
 
 
 @cache_allow_output_mutation
 def get_moving_and_static():
-    padded_window_slice = pad_slices(window_slice, padding=conf.PADDING_SIZE,
-                                     assert_shape=feature_map.shape)
-    feature_patch = np.pad(feature_map[patch_slice], conf.PADDING_SIZE)
-    feature_window = feature_map[padded_window_slice]
-    return feature_patch, feature_window
+    return get_padded_moving_and_static(feature_map, params.moving_slices, params.static_slices)
 
 
 moving, static = get_moving_and_static()
@@ -264,7 +254,6 @@ def get_centroids_intervals():
         return get_n_equidistant_angles_and_intervals(params.num_centroids)
     elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
         return get_main_gradient_angles_and_intervals(IMAGE_FOR_MAIN_DIRECTIONS, params.kde_rho)
-    raise AttributeError(params)
 
 
 centroids, intervals = get_centroids_intervals()
@@ -695,48 +684,13 @@ if config in configs:
 elif st.sidebar.button("Run calculation"):
 
     pbar = StreamlitProgressWrapper(total=config.num_iterations)
-
-    # run calculation
-    # TODO improve this
-    # TODO maybe recompute centroids, intervals etc.?
-    results = None
-    assignment_fn = None
-
-    if config.assignment_type == 'binary' and config.filter_method == 'Farid derivative filter':
-        assignment_fn = get_binary_assignments_from_centroids
-    elif config.assignment_type == 'binary' and config.filter_method == 'Gabor filter':
-        assignment_fn = partial(get_binary_assignments_from_gabor, sigma=config.gabor_filter_sigma)
-    elif config.assignment_type == 'memberships' and config.filter_method == 'Farid derivative filter':
-        assignment_fn = get_memberships_from_centroids
-    elif config.assignment_type == 'memberships' and config.filter_method == 'Gabor filter':
-        assignment_fn = partial(get_memberships_from_gabor, sigma=config.gabor_filter_sigma)
-
-    common_params = dict(moving=moving, static=static, n_iter=config.num_iterations,
-                         centroids=centroids, intervals=intervals, progress_bar=pbar,
-                         assignments_fn=assignment_fn,
-                         weight_correspondence_angles=config.weight_correspondence_angles)
-
-    estimate_fn = None
-    if config.transform_type == 'linear transform':
-        estimate_fn = partial(estimate_linear_transform, reg_factor=config.l2_regularization_factor,
-                              ttype=config.linear_transform_type)
-    elif config.transform_type == 'dense displacement':
-        estimate_fn = partial(estimate_dense_displacements, smooth=config.smoothness,
-                              rbf_type=config.rbf_type, reduce_coeffs=config.num_dct_coeffs)
-
-    results = estimate_fn(**common_params)
+    results = run_config(config, pbar)
 
     if results is None:
         st.error("Failed to run config!")
     else:
-        config.save()
-
-        result_obj = RunResult(moving=moving.copy(), static=static.copy(), centroids=centroids.copy(),
-                               intervals=intervals.copy(), results=results,
-                               warped_moving=[apply_transform(moving, r.stacked_transform) for r in results])
-        config.save_results(result_obj)
         configs.append(config)
-
         load_config_and_show()
+
 else:
     st.info("Click 'Run calculation' in the sidebar to get results.")
