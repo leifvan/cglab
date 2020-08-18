@@ -149,7 +149,7 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
                                                    rbf_type,
                                                    centroids_for_weighting)
 
-        if reduce_coeffs:
+        if reduce_coeffs < moving.shape[0]:
             dct = dense_displacement_to_dct(warp_field, reduce_coeffs)
             warp_field = dct_to_dense_displacement(dct, warp_field.shape)
 

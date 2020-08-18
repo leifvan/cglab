@@ -31,7 +31,7 @@ GABOR_FILTER_SIGMA_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0.
                                                 value=0.5, step=0.1)
 
 RESPONSE_CUTOFF_THRESHOLD = ParamDescriptor(ParamType.INTERVAL, min_value=-1., max_value=0.,
-                                            value=-1/4., step=1/32, exponential=True)
+                                            value=-1 / 4., step=1 / 32, exponential=True)
 
 
 class CentroidMethod(ValueIterEnum):
@@ -90,8 +90,9 @@ SMOOTHNESS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1., max_va
 L2_REGULARIZATION_FACTOR_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0,
                                                       max_value=20000, value=2000, step=100)
 
-NUM_DCT_COEFFS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0, max_value=100, value=0,
-                                            step=1)
+NUM_DCT_COEFFS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1,
+                                            max_value=PATCH_SIZE + 2 * PADDING_SIZE,
+                                            value=PATCH_SIZE + 2 * PADDING_SIZE, step=1)
 
 NUM_ITERATIONS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max_value=200,
                                             value=20, step=1, vis_type=VisType.NUMBER_INPUT)

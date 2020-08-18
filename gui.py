@@ -34,11 +34,16 @@ cache_allow_output_mutation = partial(st.cache, allow_output_mutation=True)
 configs = load_previous_configs()
 params = PartialRunConfiguration()
 
-'''
-# Gradient-based registration
-'''
-
+# get data for sidebar
 config = conf.DEFAULT_CONFIG
+
+feature_map_paths = list(conf.FEATURE_MAP_DIR.glob("*.png"))
+texture_path_dict = {p.name: conf.TEXTURE_DIR / p.name for p in feature_map_paths}
+
+# ++++++++++++++
+#    SIDEBAR
+# ++++++++++++++
+
 config_name = st.sidebar.text_input("load an existing config", max_chars=16, value="")
 if st.sidebar.button("load config"):
     config_name_to_config = {c.name: c for c in configs}
@@ -50,14 +55,89 @@ if st.sidebar.button("load config"):
 
 st.sidebar.markdown("---")
 
-feature_map_paths = list(conf.FEATURE_MAP_DIR.glob("*.png"))
-texture_path_dict = {p.name: conf.TEXTURE_DIR / p.name for p in feature_map_paths}
 params.feature_map_path = st.sidebar.selectbox("Choose a feature map",
                                                options=[p.name for p in feature_map_paths])
 
 params.downscale_factor = make_st_widget(conf.DOWNSCALE_FACTOR_DESCRIPTOR,
                                          label="downscale factor",
                                          value=config.downscale_factor)
+
+params.patch_position = make_st_widget(conf.PATCH_POSITION_DESCRIPTOR,
+                                       label="index of the patch pair to choose",
+                                       value=config.patch_position)
+
+params.centroid_method = make_st_widget(conf.CENTROID_METHOD_DESCRIPTOR,
+                                        label="how to determine main gradient directions",
+                                        value=config.centroid_method)
+
+if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
+    params.num_centroids = make_st_widget(conf.NUM_CENTROIDS_DESCRIPTOR,
+                                          label="number of equidistant angles",
+                                          value=config.num_centroids)
+elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
+    params.kde_rho = make_st_widget(conf.KDE_RHO_DESCRIPTOR,
+                                    label="rho-value for the KDE",
+                                    value=config.kde_rho)
+
+st.sidebar.markdown('---')
+
+params.filter_method = make_st_widget(conf.FILTER_METHOD_DESCRIPTOR,
+                                      label="method for retrieving angle responses",
+                                      value=config.filter_method)
+
+if params.filter_method == conf.FilterMethod.GABOR:
+    params.gabor_filter_sigma = make_st_widget(conf.GABOR_FILTER_SIGMA_DESCRIPTOR,
+                                               label="gabor filter sigma",
+                                               value=config.gabor_filter_sigma)
+
+params.response_cutoff_threshold = make_st_widget(conf.RESPONSE_CUTOFF_THRESHOLD,
+                                                  label="response cutoff")
+
+st.sidebar.markdown('---')
+
+params.assignment_type = make_st_widget(conf.ASSIGNMENT_TYPE_DESCRIPTOR,
+                                        label="assignment type",
+                                        value=config.assignment_type)
+
+params.weight_correspondence_angles = make_st_widget(conf.WEIGHT_CORRESPONDENCE_ANGLES_DESCRIPTOR,
+                                                     label="weight correspondences on similarity with main direction")
+
+st.sidebar.markdown('---')
+
+params.transform_type = make_st_widget(conf.TRANSFORM_TYPE_DESCRIPTOR,
+                                       label="transform type",
+                                       value=config.transform_type)
+
+if params.transform_type == conf.TransformType.LINEAR:
+    params.linear_transform_type = make_st_widget(conf.LINEAR_TRANSFORM_TYPE_DESCRIPTOR,
+                                                  label='linear transform type',
+                                                  value=config.linear_transform_type)
+
+    params.l2_regularization_factor = make_st_widget(conf.L2_REGULARIZATION_FACTOR_DESCRIPTOR,
+                                                     label="L2 regularization",
+                                                     value=config.l2_regularization_factor)
+elif params.transform_type == conf.TransformType.DENSE:
+    params.rbf_type = make_st_widget(conf.RBF_TYPE_DESCRIPTOR, label="RBF type", value=config.rbf_type)
+    params.smoothness = make_st_widget(conf.SMOOTHNESS_DESCRIPTOR,
+                                       label="warp field smoothness",
+                                       value=config.smoothness)
+    params.num_dct_coeffs = make_st_widget(conf.NUM_DCT_COEFFS_DESCRIPTOR,
+                                           label="spectral coefficients",
+                                           value=config.num_dct_coeffs)
+
+
+params.num_iterations = make_st_widget(conf.NUM_ITERATIONS_DESCRIPTOR,
+                                       label="number of iterations",
+                                       value=config.num_iterations)
+
+
+# ++++++++++++++
+#   MAIN PAGE
+# ++++++++++++++
+
+'''
+# Gradient-based registration
+'''
 
 
 @cache_allow_output_mutation
@@ -95,12 +175,6 @@ A simple patch matching algorithm is run on the image to find two similar patche
 measured as the MAE between the images. The index determines which of the
 {conf.NUM_PATCH_PAIRS} best pairs to pick. The similarity decreases with higher values.
 '''
-
-params.patch_position = make_st_widget(conf.PATCH_POSITION_DESCRIPTOR,
-                                       label="index of the patch pair to choose",
-                                       value=config.patch_position)
-
-st.sidebar.markdown('---')
 
 
 @cache_allow_output_mutation(show_spinner=False, persist=True)
@@ -164,17 +238,11 @@ direction we also need an interval s.t. every angle in that interval is assigned
 direction.
 '''
 
-params.centroid_method = make_st_widget(conf.CENTROID_METHOD_DESCRIPTOR,
-                                        label="how to determine main gradient directions",
-                                        value=config.centroid_method)
-
 if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
     '''
     Here we simply choose $n$ equidistant directions and intervals.
     '''
-    params.num_centroids = make_st_widget(conf.NUM_CENTROIDS_DESCRIPTOR,
-                                          label="number of equidistant angles",
-                                          value=config.num_centroids)
+
 elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
     r'''
     Use a direct kernel density estimation on the angles and take the maxima of the resulting
@@ -189,13 +257,6 @@ elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
     $$
     $\rho\in (0,1)$ is the smoothness parameter, where higher values lead to a less-smoothed estimate.
     '''
-    params.kde_rho = make_st_widget(conf.KDE_RHO_DESCRIPTOR,
-                                    label="rho-value for the KDE",
-                                    value=config.kde_rho)
-else:
-    raise AttributeError(f"Centroid method incorrect. {params}")
-
-st.sidebar.markdown('---')
 
 
 @cache_allow_output_mutation
@@ -280,21 +341,12 @@ st.image(image=plot_angles())
 ### Binary assignments
 '''
 
-params.filter_method = make_st_widget(conf.FILTER_METHOD_DESCRIPTOR,
-                                      label="method for retrieving angle responses",
-                                      value=config.filter_method)
 if params.filter_method == conf.FilterMethod.FARID_DERIVATIVE:
     get_binary_assignments = get_binary_assignments_from_centroids
     get_memberships = get_memberships_from_centroids
 elif params.filter_method == conf.FilterMethod.GABOR:
-    params.gabor_filter_sigma = make_st_widget(conf.GABOR_FILTER_SIGMA_DESCRIPTOR,
-                                               label="gabor filter sigma",
-                                               value=config.gabor_filter_sigma)
     get_binary_assignments = partial(get_binary_assignments_from_gabor, sigma=params.gabor_filter_sigma)
     get_memberships = partial(get_memberships_from_gabor, sigma=params.gabor_filter_sigma)
-
-params.response_cutoff_threshold = make_st_widget(conf.RESPONSE_CUTOFF_THRESHOLD,
-                                                  label="response cutoff")
 
 centroids_degrees_and_all = ('-- all --', *centroids_degrees)
 picked_angle = st.selectbox(label='angle for assignments', options=centroids_degrees_and_all)
@@ -361,10 +413,6 @@ def get_static_assignments_distances_directions():
 
 static_assignments, static_distances, static_directions = get_static_assignments_distances_directions()
 
-params.assignment_type = make_st_widget(conf.ASSIGNMENT_TYPE_DESCRIPTOR,
-                                        label="assignment type",
-                                        value=config.assignment_type)
-
 if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
 
     r'''
@@ -397,16 +445,11 @@ if params.assignment_type == conf.AssignmentType.MEMBERSHIPS:
 
     st.image(image=plot_memberships())
 
-params.weight_correspondence_angles = make_st_widget(conf.WEIGHT_CORRESPONDENCE_ANGLES_DESCRIPTOR,
-                                                     label="weight correspondences on similarity with main direction")
-
 '''
 ### Fit a transformation
 '''
 
-params.transform_type = make_st_widget(conf.TRANSFORM_TYPE_DESCRIPTOR,
-                                       label="transform type",
-                                       value=config.transform_type)
+
 transform_type_to_name = {conf.TransformType.LINEAR: 'projective transformation',
                           conf.TransformType.DENSE: 'dense displacement map'}
 
@@ -495,13 +538,6 @@ if params.transform_type == conf.TransformType.LINEAR:
     \end{pmatrix}
     $$
     '''
-    params.linear_transform_type = make_st_widget(conf.LINEAR_TRANSFORM_TYPE_DESCRIPTOR,
-                                                  label='linear transform type',
-                                                  value=config.linear_transform_type)
-
-    params.l2_regularization_factor = make_st_widget(conf.L2_REGULARIZATION_FACTOR_DESCRIPTOR,
-                                                     label="L2 regularization",
-                                                     value=config.l2_regularization_factor)
 
 elif params.transform_type == conf.TransformType.DENSE:
     r'''
@@ -515,29 +551,19 @@ elif params.transform_type == conf.TransformType.DENSE:
     $$ 
     where 
     '''
-    params.rbf_type = make_st_widget(conf.RBF_TYPE_DESCRIPTOR, label="RBF type", value=config.rbf_type)
-    params.smoothness = make_st_widget(conf.SMOOTHNESS_DESCRIPTOR,
-                                       label="warp field smoothness",
-                                       value=config.smoothness)
-    params.num_dct_coeffs = make_st_widget(conf.NUM_DCT_COEFFS_DESCRIPTOR,
-                                           label="spectral coefficients",
-                                           value=config.num_dct_coeffs)
-    if params.num_dct_coeffs == moving.shape[0]:
-        params.num_dct_coeffs = None
+
 
 transform_dof = None
 if params.transform_type == conf.TransformType.LINEAR:
     transform_dof = 8
 elif params.transform_type == conf.TransformType.DENSE:
-    if params.num_dct_coeffs is None or params.num_dct_coeffs == 0:
+    if params.num_dct_coeffs is None:
         transform_dof = 2 * moving.size
     else:
         transform_dof = 2 * (params.num_dct_coeffs ** 2)
 
-st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
-params.num_iterations = make_st_widget(conf.NUM_ITERATIONS_DESCRIPTOR,
-                                       label="number of iterations",
-                                       value=config.num_iterations)
+#st.sidebar.markdown(f"The resulting transform has {transform_dof} degrees of freedom.")
+
 
 '''
 ## Results
@@ -673,7 +699,7 @@ def load_config_and_show():
         texture_path = texture_path_dict[config.feature_map_path]
         texture = imageio.imread(texture_path)[..., :3]
         texture = skimage.transform.downscale_local_mean(texture, (config.downscale_factor,
-                                                                   config.downscale_factor,1)).astype(np.uint8)
+                                                                   config.downscale_factor, 1)).astype(np.uint8)
 
         transform = run_result.results[-1].stacked_transform
         padded_patch_slice = pad_slices(patch_slice, conf.PADDING_SIZE)
@@ -681,7 +707,7 @@ def load_config_and_show():
 
         mask = apply_transform(np.ones(moving_texture.shape[:2]), transform).astype(np.uint8)
         mask = mask[conf.PADDING_SIZE:-conf.PADDING_SIZE,
-                    conf.PADDING_SIZE:-conf.PADDING_SIZE]
+               conf.PADDING_SIZE:-conf.PADDING_SIZE]
 
         for c in range(texture.shape[2]):
             moving_texture[..., c] = apply_transform(moving_texture[..., c],
@@ -690,19 +716,19 @@ def load_config_and_show():
                                                      order=2)
 
         moving_texture = moving_texture[conf.PADDING_SIZE:-conf.PADDING_SIZE,
-                                        conf.PADDING_SIZE:-conf.PADDING_SIZE].astype(np.uint8)
+                         conf.PADDING_SIZE:-conf.PADDING_SIZE].astype(np.uint8)
         static_texture = texture[window_slice]
         lamb = 0.5
-        #lamb = np.linspace(1,0,num=conf.PATCH_SIZE)[None,:,None]
+        # lamb = np.linspace(1,0,num=conf.PATCH_SIZE)[None,:,None]
         blended_texture = histogram_preserved_blending(moving_texture,
                                                        static_texture,
                                                        lamb)
-        #blended_texture = np.max(np.array([moving_texture, static_texture]), axis=0)
-        #blended_texture = (0.5 * moving_texture + 0.5 * static_texture).astype(np.uint8)
+        # blended_texture = np.max(np.array([moving_texture, static_texture]), axis=0)
+        # blended_texture = (0.5 * moving_texture + 0.5 * static_texture).astype(np.uint8)
 
-        axs[0].imshow(moving_texture * mask[...,None], vmin=0, vmax=255)
-        axs[1].imshow(blended_texture * mask[...,None], vmin=0, vmax=255)
-        axs[2].imshow(static_texture * mask[...,None], vmin=0, vmax=255)
+        axs[0].imshow(moving_texture * mask[..., None], vmin=0, vmax=255)
+        axs[1].imshow(blended_texture * mask[..., None], vmin=0, vmax=255)
+        axs[2].imshow(static_texture * mask[..., None], vmin=0, vmax=255)
         axs[0].set_title("warped source")
         axs[1].set_title("blend")
         axs[2].set_title("target")
