@@ -63,6 +63,10 @@ params.downscale_factor = make_st_widget(conf.DOWNSCALE_FACTOR_DESCRIPTOR,
                                          label="downscale factor",
                                          value=config.downscale_factor)
 
+params.patch_position_type = make_st_widget(conf.PATCH_POSITION_TYPE_DESCRIPTOR,
+                                            label="what kind of pairs should be chosen",
+                                            value=config.patch_position_type)
+
 # FIXME this is now hacked, because this just generates origins, see below
 params.patch_position = make_st_widget(conf.PATCH_POSITION_DESCRIPTOR,
                                        label="index of the patch pair to choose",
@@ -175,7 +179,8 @@ def get_patch_pairs():
     return find_promising_patch_pairs(feature_map, patch_size=conf.PATCH_SIZE,
                                       stride=conf.PATCH_STRIDE(params.downscale_factor),
                                       padding=conf.PADDING_SIZE,
-                                      num_pairs=conf.NUM_PATCH_PAIRS)
+                                      num_pairs=conf.NUM_PATCH_PAIRS,
+                                      best=params.patch_position_type != conf.PatchPositionType.WORST)
 
 
 patch_pairs = get_patch_pairs()

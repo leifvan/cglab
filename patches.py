@@ -16,7 +16,7 @@ def patches_iterator(height, width, patch_size, stride=1, padding=0):
             yield tuple([slice(y, y + patch_size), slice(x, x + patch_size)])
 
 
-def find_promising_patch_pairs(feature_map, patch_size, stride=1, padding=0, num_pairs=10):
+def find_promising_patch_pairs(feature_map, patch_size, stride=1, padding=0, num_pairs=10, best=True):
     num_patches = ceil((feature_map.shape[0] - patch_size) / stride) * ceil(
         (feature_map.shape[1] - patch_size) / stride)
     num_patch_pairs = num_patches * (num_patches - 1) // 2
@@ -25,7 +25,11 @@ def find_promising_patch_pairs(feature_map, patch_size, stride=1, padding=0, num
 
     pairs_iterator = combinations(patches_iterator(*feature_map.shape[:2], patch_size, stride, padding), r=2)
     for i, (slice_a, slice_b) in enumerate(tqdm(pairs_iterator, total=num_patch_pairs)):
-        dist = np.linalg.norm(feature_map[slice_a] - feature_map[slice_b])
+        if best:
+            factor = 1
+        else:
+            factor = -1
+        dist = factor * np.linalg.norm(feature_map[slice_a] - feature_map[slice_b])
         best_indices.add((slice_a, slice_b, dist))
 
     return tuple(best_indices.items)

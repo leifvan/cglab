@@ -38,11 +38,13 @@ class RunResult:
     warped_moving: list = attr.ib()
 
 
+# TODO enforce correct values with enums
 @attr.s
 class PartialRunConfiguration:
     feature_map_path: str = attr.ib(default=None)
     file_path: Path = attr.ib(default=None, eq=False)
     downscale_factor: int = attr.ib(default=None)
+    patch_position_type: str = attr.ib(default=None)
     patch_position: int = attr.ib(default=None)  # FIXME about to be deprecated
     moving_slices: Sequence[slice] = attr.ib(default=None)
     static_slices: Sequence[slice] = attr.ib(default=None)
@@ -236,6 +238,15 @@ class ValueIterEnum(str, Enum):
 DOWNSCALE_FACTOR_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max_value=4,
                                               value=4, step=1, vis_type=VisType.NUMBER_INPUT)
 
+
+class PatchPositionType(ValueIterEnum):
+    BEST = 'best'
+    WORST = 'worst'
+
+
+PATCH_POSITION_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL,
+                                                 options=PatchPositionType.values())
+
 PATCH_POSITION_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max_value=1000,
                                             value=250, step=1, vis_type=VisType.NUMBER_INPUT)
 
@@ -320,6 +331,7 @@ NUM_ITERATIONS_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max
                                             value=20, step=1, vis_type=VisType.NUMBER_INPUT)
 
 PARAM_DESCRIPTOR_MAP = OrderedDict(downscale_factor=DOWNSCALE_FACTOR_DESCRIPTOR,
+                                   patch_position_type=PATCH_POSITION_TYPE_DESCRIPTOR,
                                    patch_position=PATCH_POSITION_DESCRIPTOR,
                                    filter_method=FILTER_METHOD_DESCRIPTOR,
                                    gabor_filter_sigma=GABOR_FILTER_SIGMA_DESCRIPTOR,
