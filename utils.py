@@ -170,3 +170,10 @@ class TransformResult:
     stacked_transform = attr.ib()
     error = attr.ib()
     energy = attr.ib()
+
+
+def get_boundary_mask(shape, start, stop):
+    mask = np.zeros(shape)
+    for k in range(start, stop+1):
+        mask[k:-k-1, k:-k-1] = (k - start) / (stop - start)
+    return mask

@@ -6,7 +6,7 @@ from displacement import get_correspondences_energy, estimate_transform_from_mem
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids
 from gradient_directions import get_n_equidistant_angles_and_intervals
-from utils import TransformResult
+from utils import TransformResult, get_boundary_mask
 
 
 def apply_transform(moving, transform, **kwargs):
@@ -60,9 +60,15 @@ def _estimate_warp_iteratively(estimate_fn, original_moving, static, n_iter,
     return results
 
 
+def _make_boundary_mask(shape):
+    # FIXME this is hardcoded
+    return get_boundary_mask(shape, 10, 15)
+
+
 def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assignments_fn,
                               reg_factor, ttype, progress_bar=None,
-                              weight_correspondence_angles=False):
+                              weight_correspondence_angles=False,
+                              reduce_boundary_weights=False):
     """
     Estimates a projective transform that minimizes error of correspondences between ``moving``
     and ``static`` by transforming ``moving``. The correspondences are induced by the given
@@ -81,25 +87,30 @@ def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assi
     :param ttype: # FIXME missing docstring
     :param progress_bar: An optional progress_bar to report progress to.
     :param weight_correspondence_angles: # FIXME missing docstring
+    :param reduce_boundary_weights: # FIXME missing docstring
     :return: A list of :class:`TransformResult` objects containing the results of each iteration.
     """
-    # TODO previously we used the whole image for that to also be aware of the surroundings
-    # TODO maybe use strings for assignments_fn to simplify function calls (and let module handle internal references)
-    # TODO replace progress_bar by callback?
     static_assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
     static_distances = get_distance_transforms_from_binary_assignments(static_assignments)
     static_directions = get_closest_feature_directions_from_binary_assignments(static_assignments)
 
     centroids_for_weighting = centroids if weight_correspondence_angles else None
+    weight_mask = _make_boundary_mask(moving.shape[:2]) if reduce_boundary_weights else None
 
     def estimate_fn(moving, static, previous_transform):
         moving_assignments = assignments_fn(moving, centroids, intervals)
+
+        warped_weight_mask = weight_mask
+        if weight_mask is not None and previous_transform is not None:
+            warped_weight_mask = apply_transform(weight_mask, previous_transform)
+
         transform = estimate_transform_from_memberships(moving_assignments,
                                                         static_distances,
                                                         static_directions,
                                                         reg_factor,
                                                         ttype,
-                                                        centroids_for_weighting)
+                                                        centroids_for_weighting,
+                                                        warped_weight_mask)
         # we use transform classes from skimage here, they can be concatenated with +
         return transform if previous_transform is None else transform + previous_transform
 
@@ -110,7 +121,7 @@ def estimate_linear_transform(moving, static, n_iter, centroids, intervals, assi
 
 def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, smooth, rbf_type,
                                  assignments_fn, reduce_coeffs=None, progress_bar=None,
-                                 weight_correspondence_angles=False):
+                                 weight_correspondence_angles=False, reduce_boundary_weights=False):
     """
     Estimates a dense warp field that minimizes error of correspondences between ``moving``
     and ``static`` by transforming ``moving``. The correspondences are induced by the given
@@ -129,6 +140,8 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
     :param reduce_coeffs: If not ``None``, applies a DCT to the result, truncate the coefficients
         to the given integer along both axes and transforms it back to a dense displacement.
     :param progress_bar: An optional progress_bar to report progress to.
+    :param weight_correspondence_angles: # FIXME add docstring
+    :param reduce_boundary_weights: # FIXME add docstring
     :return: A list of :class:`TransformResult` objects containing the results of each iteration.
     """
     static_assignments = get_binary_assignments_from_centroids(static, centroids, intervals)
@@ -136,18 +149,25 @@ def estimate_dense_displacements(moving, static, n_iter, centroids, intervals, s
     static_directions = get_closest_feature_directions_from_binary_assignments(static_assignments)
 
     centroids_for_weighting = centroids if weight_correspondence_angles else None
+    weight_mask = _make_boundary_mask(moving.shape[:2]) if reduce_boundary_weights else None
 
     # TODO estimate reverse transform to prevent holes
     def estimate_fn(moving, static, previous_transform):
         if previous_transform is None:
             previous_transform = np.mgrid[:moving.shape[0], :moving.shape[1]]
         moving_memberships = assignments_fn(moving, centroids, intervals)
+
+        warped_weight_mask = weight_mask
+        if weight_mask is not None:
+            warped_weight_mask = apply_transform(weight_mask, previous_transform)
+
         warp_field = calculate_dense_displacements(moving_memberships,
                                                    static_distances,
                                                    static_directions,
                                                    smooth,
                                                    rbf_type,
-                                                   centroids_for_weighting)
+                                                   centroids_for_weighting,
+                                                   warped_weight_mask)
 
         if reduce_coeffs < moving.shape[0]:
             dct = dense_displacement_to_dct(warp_field, reduce_coeffs)

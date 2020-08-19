@@ -105,6 +105,9 @@ params.assignment_type = make_st_widget(conf.ASSIGNMENT_TYPE_DESCRIPTOR,
 params.weight_correspondence_angles = make_st_widget(conf.WEIGHT_CORRESPONDENCE_ANGLES_DESCRIPTOR,
                                                      label="weight correspondences on similarity with main direction")
 
+params.reduce_boundary_weights = make_st_widget(conf.REDUCE_BOUNDARY_WEIGHTS_DESCRIPTOR,
+                                                label="reduce correspondence weights on boundary")
+
 st.sidebar.markdown('---')
 
 params.transform_type = make_st_widget(conf.TRANSFORM_TYPE_DESCRIPTOR,
@@ -407,13 +410,15 @@ def plot_binary_correspondences():
     if picked_angle_index == -1:
         plot_correspondences(moving, static, centroids, memberships,
                              static_distances, static_directions,
-                             weight_correspondence_angles=params.weight_correspondence_angles)
+                             weight_correspondence_angles=params.weight_correspondence_angles,
+                             reduce_boundary_weights=params.reduce_boundary_weights)
     else:
         plot_correspondences(moving, static, centroids[picked_angle_index, None],
                              memberships[picked_angle_index, None],
                              static_distances[picked_angle_index, None],
                              static_directions[picked_angle_index, None],
-                             weight_correspondence_angles=params.weight_correspondence_angles)
+                             weight_correspondence_angles=params.weight_correspondence_angles,
+                             reduce_boundary_weights=params.reduce_boundary_weights)
     plt.title(f"correspondences from {name}")
     plt.tight_layout()
     return figure_to_image()
@@ -526,7 +531,8 @@ def load_config_and_show():
 
         plot_correspondences(warped_moving, static, centroids, warped_moving_assignments,
                              static_distances, static_directions,
-                             weight_correspondence_angles=params.weight_correspondence_angles,
+                             weight_correspondence_angles=config.weight_correspondence_angles,
+                             reduce_boundary_weights=config.reduce_boundary_weights,
                              ax=axs[1, 1])
         axs[1, 1].set_title("warped correspondences")
         # if config.assignment_type == conf.AssignmentType.BINARY:
@@ -633,13 +639,13 @@ def load_config_and_show():
                          conf.PADDING_SIZE:-conf.PADDING_SIZE].astype(np.uint8)
         static_texture = texture[window_slice]
         lamb = 0.5
-        lamb = np.linspace(1,0,num=conf.PATCH_SIZE)[None,:,None]
-        blended_texture = histogram_preserved_blending(moving_texture,
-                                                       static_texture,
-                                                       lamb)
+        #lamb = np.linspace(1,0,num=conf.PATCH_SIZE)[None,:,None]
+        # blended_texture = histogram_preserved_blending(moving_texture,
+        #                                                static_texture,
+        #                                                lamb)
         #blended_texture = np.max(np.array([moving_texture, static_texture]), axis=0)
         #blended_texture = np.min(np.array([moving_texture, static_texture]), axis=0)
-        # blended_texture = (0.5 * moving_texture + 0.5 * static_texture).astype(np.uint8)
+        blended_texture = (0.5 * moving_texture + 0.5 * static_texture).astype(np.uint8)
 
         axs[0].imshow(moving_texture * mask[..., None], vmin=0, vmax=255)
         axs[1].imshow(blended_texture * mask[..., None], vmin=0, vmax=255)

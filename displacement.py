@@ -24,7 +24,7 @@ from scipy.spatial.distance import pdist, squareform, cdist
 from skimage.transform import ProjectiveTransform, warp
 
 import gui_config as conf
-from utils import get_colored_difference_image, angle_to_rgb
+from utils import get_colored_difference_image, angle_to_rgb, get_boundary_mask
 from gui_config import LinearTransformType
 
 
@@ -41,7 +41,7 @@ class Correspondences:
     aa: np.ndarray = attr.ib()
 
     @classmethod
-    def from_memberships(cls, memberships, distances, directions, centroids=None):
+    def from_memberships(cls, memberships, distances, directions, centroids=None, weight_mask=None):
         aa, yy, xx = np.nonzero(memberships)
         angles_cartesian = np.array([np.sin(directions[aa, yy, xx]), np.cos(directions[aa, yy, xx])])
         uu, vv = angles_cartesian * distances[aa, yy, xx]
@@ -54,6 +54,9 @@ class Correspondences:
             centroids_cartesian = np.array([np.sin(centroids), np.cos(centroids)])
             similarity = np.sum(angles_cartesian * centroids_cartesian[:, aa], axis=0)
             weights *= np.abs(similarity)#np.clip(similarity, 0., 1.)
+
+        if weight_mask is not None:
+            weights *= weight_mask[yy, xx]
 
         return cls(src=src, dst=dst, weights=weights, aa=aa)
 
@@ -103,7 +106,8 @@ def estimate_dense_warp_field(c: Correspondences, smooth, rbf_type, shape):
 
 
 # TODO improve docstring for this function
-def calculate_dense_displacements(memberships, distances, directions, smooth, rbf_type, centroids):
+def calculate_dense_displacements(memberships, distances, directions, smooth, rbf_type,
+                                  centroids, weight_mask):
     """
     Calculates a displacement map based on memberships using L2-regularized radial basis
     functions.
@@ -116,15 +120,18 @@ def calculate_dense_displacements(memberships, distances, directions, smooth, rb
         directions[k, i, j] is the angle from [i,j] to the next edge pixel with angle k.
     :param smooth: L2-regularization factor for the RBFs.
     :param rbf_type: The type of radial basis function to use.
+    :param centroids: # FIXME add docstring
+    :param weight_mask: # FIXME add docstring
     :return: An array (2, height, width) of y and x displacements for each pixel, i.e. [:,i,j] is
         the displacement (y,x) of pixel [i,j].
     """
-    correspondences = Correspondences.from_memberships(memberships, distances, directions, centroids)
+    correspondences = Correspondences.from_memberships(memberships, distances, directions,
+                                                       centroids, weight_mask)
     return estimate_dense_warp_field(correspondences, smooth, rbf_type, memberships.shape[1:])
 
 
 def plot_correspondences(moving, static, centroids, memberships, distances, directions,
-                         weight_correspondence_angles, ax=None):
+                         weight_correspondence_angles, reduce_boundary_weights, ax=None):
     """
     Plots correspondences for each edge pixel in ``moving`` to its closest pixel in ``centroids``.
     More specifically, each non-null value in ``memberships`` is considered an edge-pixel of a
@@ -143,13 +150,21 @@ def plot_correspondences(moving, static, centroids, memberships, distances, dire
         distances[k, i, j] is the distance of pixel [i,j] to the next edge pixel with angle k.
     :param directions: An array (n_angles, height, width) of angles to the next edge pixel, i.e.
         directions[k, i, j] is the angle from [i,j] to the next edge pixel with angle k.
+    :param reduce_boundary_weights: # FIXME add docstring
     :param ax: An optional matplotlib axis to draw the plot onto. If ``None``, the current axis
         will be used.
     """
     ax = ax or plt.gca()
     assert np.all(memberships <= 1)
     centroids_for_weighting = centroids if weight_correspondence_angles else None
-    c = Correspondences.from_memberships(memberships, distances, directions, centroids_for_weighting)
+
+    weight_mask = None
+    if reduce_boundary_weights:
+        # FIXME weights hardcoded + do not take transform into account
+        weight_mask = get_boundary_mask(moving.shape[:2], 10, 15)
+
+    c = Correspondences.from_memberships(memberships, distances, directions,
+                                         centroids_for_weighting, weight_mask)
     aa = c.aa
     yy, xx, uu, vv = c.get_yxuv()
     colors = angle_to_rgb(centroids[aa], with_alpha=True)
@@ -249,7 +264,8 @@ def plot_projective_transform(transform, ax=None):
 
 
 def estimate_transform_from_memberships(memberships, distances, directions, reg_factor=0.,
-                                        ttype=conf.LinearTransformType.PROJECTIVE, centroids=None):
+                                        ttype=conf.LinearTransformType.PROJECTIVE, centroids=None,
+                                        weight_mask=None):
     """
     Estimates a projective transform based on the correspondences inferred by the given arrays.
     More specifically, each non-null value in ``memberships`` is considered an edge-pixel of a
@@ -274,9 +290,11 @@ def estimate_transform_from_memberships(memberships, distances, directions, reg_
     :param centroids: An array (n_angles,) of main directions. If given, the correspondences will
         be weighted w.r.t. the angle similarity of the correspondence vector and the main
         direction it originated from. If ``None``, no such weighting is applied.
+    :param weight_mask: # FIXME missing docstring
     :return: An ``skimage.transform.ProjectiveTransform`` instance that describes an optimal
         projective transform (in the least-squares sense) of the inferred correspondences.
     """
-    correspondences = Correspondences.from_memberships(memberships, distances, directions, centroids)
+    correspondences = Correspondences.from_memberships(memberships, distances, directions,
+                                                       centroids, weight_mask)
     indices = TTYPE_TO_INDICES[ttype]
     return estimate_projective_transform(correspondences, reg_factor=reg_factor, select_params=indices)

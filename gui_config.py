@@ -54,6 +54,7 @@ class PartialRunConfiguration:
     kde_rho: float = attr.ib(default=None)
     assignment_type: str = attr.ib(default=None)
     weight_correspondence_angles: bool = attr.ib(default=None)
+    reduce_boundary_weights: bool = attr.ib(default=None)
     transform_type: str = attr.ib(default=None)
     linear_transform_type: str = attr.ib(default=None)
     rbf_type: str = attr.ib(default=None)
@@ -275,6 +276,8 @@ ASSIGNMENT_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=Assi
 
 WEIGHT_CORRESPONDENCE_ANGLES_DESCRIPTOR = ParamDescriptor(ParamType.BOOLEAN)
 
+REDUCE_BOUNDARY_WEIGHTS_DESCRIPTOR = ParamDescriptor(ParamType.BOOLEAN)
+
 
 class TransformType(ValueIterEnum):
     LINEAR = 'linear'
@@ -325,6 +328,8 @@ PARAM_DESCRIPTOR_MAP = OrderedDict(downscale_factor=DOWNSCALE_FACTOR_DESCRIPTOR,
                                    num_centroids=NUM_CENTROIDS_DESCRIPTOR,
                                    kde_rho=KDE_RHO_DESCRIPTOR,
                                    assignment_type=ASSIGNMENT_TYPE_DESCRIPTOR,
+                                   weight_correspondence_angles=WEIGHT_CORRESPONDENCE_ANGLES_DESCRIPTOR,
+                                   reduce_boundary_weights=REDUCE_BOUNDARY_WEIGHTS_DESCRIPTOR,
                                    transform_type=TRANSFORM_TYPE_DESCRIPTOR,
                                    linear_transform_type=LINEAR_TRANSFORM_TYPE_DESCRIPTOR,
                                    rbf_type=RBF_TYPE_DESCRIPTOR,

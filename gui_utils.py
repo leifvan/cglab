@@ -167,7 +167,8 @@ def run_config(config: RunConfiguration, pbar):
     common_params = dict(moving=moving, static=static, n_iter=config.num_iterations,
                          centroids=centroids, intervals=intervals, progress_bar=pbar,
                          assignments_fn=assignment_fn,
-                         weight_correspondence_angles=config.weight_correspondence_angles)
+                         weight_correspondence_angles=config.weight_correspondence_angles,
+                         reduce_boundary_weights=config.reduce_boundary_weights)
 
     estimate_fn = None
     if config.transform_type == conf.TransformType.LINEAR:
