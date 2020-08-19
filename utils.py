@@ -11,30 +11,6 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import CSS4_COLORS, to_rgb
 
 
-def plot_diff(warped, target, axs=None):
-    """
-    Creates a figure with 3 images (from left to right):
-
-    - the warped image
-    - the difference between warped and target, and
-    - the target image.
-
-    Note: ``plt.show()`` will not be called by this function.
-
-    :param warped: The warped image.
-    :param target: The target image.
-    :param axs: Optional list of 3 axes to plot to. If ``None``, a new figure will be created.
-    """
-    if axs is None:
-        _, axs = plt.subplots(1, 3, figsize=(12, 4))
-    axs[0].imshow(get_colored_difference_image(moving=warped))
-    axs[1].imshow(get_colored_difference_image(moving=warped, static=target))
-    axs[2].imshow(get_colored_difference_image(static=target))
-
-    for ax in axs:
-        ax.axis('off')
-
-
 def pad_slices(slices, padding, assert_shape=None):
     """
     Pads a list of slices with the ``padding`` value, e.g. if ``slices=[[5:8],[2:4]]`` and

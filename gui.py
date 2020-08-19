@@ -23,12 +23,13 @@ from distance_transform import get_binary_assignments_from_centroids, get_distan
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
     plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
 from gui_config import PartialRunConfiguration, make_st_widget
-from gui_plotting import plot_centroids_intervals_polar, plot_multiple_binary_assignments, plot_memberships
+from gui_plotting import plot_centroids_intervals_polar, plot_multiple_binary_assignments, plot_memberships, plot_diff
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
-    StreamlitProgressWrapper, load_and_preprocess_feature_map, get_padded_moving_and_static, run_config
+    StreamlitProgressWrapper, load_and_preprocess_feature_map, get_padded_moving_and_static, run_config, get_kde_scores, \
+    angle_to_degrees
 from methods import apply_transform
 from patches import find_promising_patch_pairs
-from utils import plot_diff, pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
+from utils import pad_slices, get_colored_difference_image, get_slice_intersection, angle_to_rgb
 
 cache_allow_output_mutation = partial(st.cache, allow_output_mutation=True)
 
@@ -170,7 +171,7 @@ measured as the MAE between the images. The index determines which of the
 @cache_allow_output_mutation(show_spinner=False, persist=True)
 def get_patch_pairs():
     return find_promising_patch_pairs(feature_map, patch_size=conf.PATCH_SIZE,
-                                      stride=64 // params.downscale_factor,
+                                      stride=conf.PATCH_STRIDE(params.downscale_factor),
                                       padding=conf.PADDING_SIZE,
                                       num_pairs=conf.NUM_PATCH_PAIRS)
 
@@ -189,7 +190,6 @@ def get_moving_and_static():
 
 moving, static = get_moving_and_static()
 intersection_slice = get_slice_intersection(patch_slice, window_slice)
-IMAGE_FOR_MAIN_DIRECTIONS = static
 
 
 @cache_allow_output_mutation
@@ -253,11 +253,11 @@ def get_centroids_intervals():
     if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
         return get_n_equidistant_angles_and_intervals(params.num_centroids)
     elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
-        return get_main_gradient_angles_and_intervals(IMAGE_FOR_MAIN_DIRECTIONS, params.kde_rho)
+        return get_main_gradient_angles_and_intervals(static, params.kde_rho)
 
 
 centroids, intervals = get_centroids_intervals()
-centroids_degrees = [f"{-(c / np.pi * 180 + 180) % 360:.0f}°" for c in centroids]
+centroids_degrees = angle_to_degrees(centroids)
 centroids_colors = angle_to_rgb(centroids)
 
 
@@ -270,28 +270,7 @@ def write_centroid_legend():
 
 @cache_allow_output_mutation
 def get_kde_plot_data():
-    # TODO this is just copy-and-pasted from the code in gradient_directions.py
-    angles, magnitudes = get_gradients_in_polar_coords(IMAGE_FOR_MAIN_DIRECTIONS)
-
-    # flatten
-    angles = np.ravel(angles)
-    magnitudes = np.ravel(magnitudes)
-
-    # select only pixels where magnitude does not vanish
-    indices = np.argwhere(~np.isclose(magnitudes, 0))[:, 0]
-
-    # for very dense feature maps it might make sense to sample points
-    indices = random.sample(list(indices), k=min(len(indices), 2000))
-
-    angles = angles[indices]
-    magnitudes = magnitudes[indices]
-
-    sample_points = np.linspace(-np.pi, np.pi, 360)
-    scores = wrapped_cauchy_kernel_density(theta=sample_points[:, None],
-                                           samples=angles[:, None],
-                                           weights=magnitudes,
-                                           rho=params.kde_rho)
-    return sample_points, scores
+    return get_kde_scores(static, params.kde_rho)
 
 
 @cache_allow_output_mutation
@@ -527,9 +506,9 @@ def load_config_and_show():
         axs[0, 0].set_title("unwarped")
 
         if i > 0:
-            if params.transform_type == 'linear transform':
+            if params.transform_type == conf.TransformType.LINEAR:
                 plot_projective_transform(run_result.results[i - 1].stacked_transform, ax=axs[0, 1])
-            elif params.transform_type == 'dense displacement':
+            elif params.transform_type == conf.TransformType.DENSE:
                 local_transform = run_result.results[i - 1].stacked_transform - np.mgrid[:moving.shape[0],
                                                                                 :moving.shape[1]]
                 plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[0, 1])

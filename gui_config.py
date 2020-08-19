@@ -22,8 +22,8 @@ NUM_PATCH_PAIRS = 1000
 INITIAL_PATCH_PAIR = 250
 
 
-# TODO reparameterize this somehow:
-# PATCH_STRIDE = 16
+def PATCH_STRIDE(ds):
+    return 64 // ds
 
 
 @attr.s
@@ -240,8 +240,8 @@ PATCH_POSITION_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max
 
 
 class FilterMethod(ValueIterEnum):
-    FARID_DERIVATIVE = 'Farid derivative filter'
-    GABOR = 'Gabor filter'
+    FARID_DERIVATIVE = 'farid'
+    GABOR = 'gabor'
 
 
 FILTER_METHOD_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=FilterMethod.values())
@@ -277,8 +277,8 @@ WEIGHT_CORRESPONDENCE_ANGLES_DESCRIPTOR = ParamDescriptor(ParamType.BOOLEAN)
 
 
 class TransformType(ValueIterEnum):
-    LINEAR = 'linear transform'
-    DENSE = 'dense displacement'
+    LINEAR = 'linear'
+    DENSE = 'dense'
 
 
 TRANSFORM_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=TransformType.values())
