@@ -15,13 +15,12 @@ import skimage.transform
 import streamlit as st
 
 import gui_config as conf
-from blending import histogram_preserved_blending
 from displacement import plot_correspondences, get_correspondences_energy, plot_projective_transform
 from distance_transform import get_binary_assignments_from_centroids, get_distance_transforms_from_binary_assignments, \
     get_closest_feature_directions_from_binary_assignments, get_memberships_from_centroids, \
     get_binary_assignments_from_gabor, get_memberships_from_gabor
 from gradient_directions import get_n_equidistant_angles_and_intervals, get_main_gradient_angles_and_intervals, \
-    plot_gradients_as_arrows, wrapped_cauchy_kernel_density, get_gradients_in_polar_coords, plot_binary_assignments
+    plot_gradients_as_arrows, plot_binary_assignments
 from gui_config import PartialRunConfiguration, make_st_widget
 from gui_plotting import plot_centroids_intervals_polar, plot_multiple_binary_assignments, plot_memberships, plot_diff
 from gui_utils import figure_to_image, load_previous_configs, RunConfiguration, CONFIG_SUFFIX, RUNS_DIRECTORY, \
@@ -639,12 +638,12 @@ def load_config_and_show():
                          conf.PADDING_SIZE:-conf.PADDING_SIZE].astype(np.uint8)
         static_texture = texture[window_slice]
         lamb = 0.5
-        #lamb = np.linspace(1,0,num=conf.PATCH_SIZE)[None,:,None]
+        # lamb = np.linspace(1,0,num=conf.PATCH_SIZE)[None,:,None]
         # blended_texture = histogram_preserved_blending(moving_texture,
         #                                                static_texture,
         #                                                lamb)
-        #blended_texture = np.max(np.array([moving_texture, static_texture]), axis=0)
-        #blended_texture = np.min(np.array([moving_texture, static_texture]), axis=0)
+        # blended_texture = np.max(np.array([moving_texture, static_texture]), axis=0)
+        # blended_texture = np.min(np.array([moving_texture, static_texture]), axis=0)
         blended_texture = (0.5 * moving_texture + 0.5 * static_texture).astype(np.uint8)
 
         axs[0].imshow(moving_texture * mask[..., None], vmin=0, vmax=255)
