@@ -260,7 +260,7 @@ class FilterMethod(ValueIterEnum):
 FILTER_METHOD_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=FilterMethod.values())
 
 GABOR_FILTER_SIGMA_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0.1, max_value=2.,
-                                                value=1., step=0.1)
+                                                value=0.5, step=0.1)
 
 RESPONSE_CUTOFF_THRESHOLD = ParamDescriptor(ParamType.INTERVAL, min_value=-1., max_value=0.,
                                             value=-1 / 4., step=1 / 32, exponential=True)

@@ -162,13 +162,17 @@ def run_config(config: RunConfiguration, pbar):
         if config.filter_method == conf.FilterMethod.FARID_DERIVATIVE:
             assignment_fn = get_binary_assignments_from_centroids
         elif config.filter_method == conf.FilterMethod.GABOR:
-            assignment_fn = partial(get_binary_assignments_from_gabor, sigma=config.gabor_filter_sigma)
+            assignment_fn = partial(get_binary_assignments_from_gabor,
+                                    sigma=config.gabor_filter_sigma,
+                                    threshold=config.response_cutoff_threshold)
 
     elif config.assignment_type == conf.AssignmentType.MEMBERSHIPS:
         if config.filter_method == conf.FilterMethod.FARID_DERIVATIVE:
             assignment_fn = get_memberships_from_centroids
         elif config.filter_method == conf.FilterMethod.GABOR:
-            assignment_fn = partial(get_memberships_from_gabor, sigma=config.gabor_filter_sigma)
+            assignment_fn = partial(get_memberships_from_gabor,
+                                    sigma=config.gabor_filter_sigma,
+                                    threshold=config.response_cutoff_threshold)
 
     if assignment_fn is None:
         raise ValueError(f"No valid assignment function found for "
