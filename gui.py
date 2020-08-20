@@ -143,7 +143,7 @@ params.num_iterations = make_st_widget(conf.NUM_ITERATIONS_DESCRIPTOR,
 # ++++++++++++++
 
 '''
-# Gradient-based registration
+# gradient-based registration
 '''
 
 
@@ -228,15 +228,12 @@ st.image(image=plot_moving_static_diff(), use_column_width=True)
 
 '''
 ### Finding dominant gradient directions
-Now we are looking for the main directions of gradients in the (static) image. **The following
-statement is not true for Gabor** For each main
-direction we also need an interval s.t. every angle in that interval is assigned to the main
-direction.
+Now we are looking for the main directions of gradients in the (static) image.
 '''
 
 if params.centroid_method == conf.CentroidMethod.EQUIDISTANT:
     '''
-    Here we simply choose $n$ equidistant directions and intervals.
+    We simply choose $n$ equidistant directions and intervals.
     '''
 
 elif params.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:

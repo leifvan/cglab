@@ -9,7 +9,8 @@ import attr
 import imageio
 import matplotlib.pyplot as plt
 import numpy as np
-import skimage
+import skimage.transform
+import skimage.morphology
 import streamlit as st
 import warnings
 
@@ -101,6 +102,9 @@ def load_and_preprocess_feature_map(feature_map_path, downscale_factor):
     feature_map /= feature_map.max()
     feature_map[feature_map > 0.5] = 1
     feature_map[feature_map < 0.5] = 0
+    #feature_map = skimage.morphology.thin(feature_map).astype(np.float)
+    #selem = skimage.morphology.disk(radius=9-2*downscale_factor)
+    #feature_map = skimage.morphology.binary_erosion(feature_map,selem).astype(np.float)
     return feature_map
 
 
@@ -178,18 +182,21 @@ def run_config(config: RunConfiguration, pbar):
         estimate_fn = partial(estimate_dense_displacements, smooth=config.smoothness,
                               rbf_type=config.rbf_type, reduce_coeffs=config.num_dct_coeffs)
 
-    results = estimate_fn(**common_params)
+    estimate_results = estimate_fn(**common_params)
+    results_obj = None
 
-    if results is not None:
+    if estimate_results is not None:
         # TODO check out if we really make use of all what is saved here
-        result_obj = RunResult(moving=moving.copy(), static=static.copy(), centroids=centroids.copy(),
-                               intervals=intervals.copy(), results=results,
-                               warped_moving=[apply_transform(moving, r.stacked_transform) for r in results])
+        results_obj = RunResult(moving=moving.copy(), static=static.copy(), centroids=centroids.copy(),
+                                intervals=intervals.copy(), results=estimate_results,
+                                warped_moving=[apply_transform(moving, r.stacked_transform) for r in
+                                               estimate_results])
+
         if config.file_path is not None:
             config.save()
-            config.save_results(result_obj)
+            config.save_results(results_obj)
         else:
             warnings.warn("The config and results will not be saved as a file, "
                           "because 'file_path' is None.")
 
-    return results
+    return results_obj
