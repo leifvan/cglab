@@ -252,22 +252,23 @@ PATCH_POSITION_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=1, max
 
 
 class FilterMethod(ValueIterEnum):
-    FARID_DERIVATIVE = 'farid'
     GABOR = 'gabor'
+    FARID_DERIVATIVE = 'farid'
+
 
 
 FILTER_METHOD_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=FilterMethod.values())
 
 GABOR_FILTER_SIGMA_DESCRIPTOR = ParamDescriptor(ParamType.INTERVAL, min_value=0.1, max_value=2.,
-                                                value=0.5, step=0.1)
+                                                value=1., step=0.1)
 
 RESPONSE_CUTOFF_THRESHOLD = ParamDescriptor(ParamType.INTERVAL, min_value=-1., max_value=0.,
                                             value=-1 / 4., step=1 / 32, exponential=True)
 
 
 class CentroidMethod(ValueIterEnum):
-    EQUIDISTANT = 'equidistant'
     HISTOGRAM_CLUSTERING = 'histogram clustering'
+    EQUIDISTANT = 'equidistant'
 
 
 CENTROID_METHOD_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=CentroidMethod.values())
@@ -291,8 +292,9 @@ REDUCE_BOUNDARY_WEIGHTS_DESCRIPTOR = ParamDescriptor(ParamType.BOOLEAN)
 
 
 class TransformType(ValueIterEnum):
-    LINEAR = 'linear'
     DENSE = 'dense'
+    LINEAR = 'linear'
+
 
 
 TRANSFORM_TYPE_DESCRIPTOR = ParamDescriptor(ParamType.CATEGORICAL, options=TransformType.values())
