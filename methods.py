@@ -13,13 +13,19 @@ def apply_transform(moving, transform, **kwargs):
     """
     Applies a linear or dense transformation to ``moving``.
 
-    :param moving: The 2D-image to be transformed.
+    :param moving: The 2D- or 3D-image to be transformed.
     :param transform: Any of the types :class:`skimage.transform.warp` supports for transformation,
         notably these are 3x3-matrices for projective transforms or inverse maps for dense
         transforms.
-    :return: The transformation result, a 2D-image of the same dimensions as ``moving``.
+    :return: The transformation result, an image of the same dimensions as ``moving``.
     """
-    return skimage.transform.warp(moving, transform, **kwargs)
+    if moving.ndim == 2:
+        return skimage.transform.warp(moving, transform, **kwargs)
+    elif moving.ndim == 3:
+        warped_moving = moving.copy()
+        for channel in np.rollaxis(warped_moving, 2):
+            channel[:] = skimage.transform.warp(channel, transform, **kwargs)
+        return warped_moving
 
 
 def _get_error(moving, static):

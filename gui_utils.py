@@ -111,7 +111,14 @@ def load_and_preprocess_feature_map(feature_map_path, downscale_factor):
 def get_padded_moving_and_static(feature_map, moving_slices, static_slices):
     padded_static_slice = pad_slices(static_slices, padding=conf.PADDING_SIZE,
                                      assert_shape=feature_map.shape)
-    moving = np.pad(feature_map[moving_slices], conf.PADDING_SIZE)
+    if feature_map.ndim == 2:
+        moving = np.pad(feature_map[moving_slices], conf.PADDING_SIZE)
+    elif feature_map.ndim == 3:
+        ps = conf.PADDING_SIZE
+        moving = np.pad(feature_map[moving_slices], ((ps,ps),(ps,ps),(0,0)))
+    else:
+        raise ValueError("feature map must be 2D or 3D.")
+
     static = feature_map[padded_static_slice]
     return moving, static
 
