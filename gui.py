@@ -143,7 +143,7 @@ params.num_iterations = make_st_widget(conf.NUM_ITERATIONS_DESCRIPTOR,
 # ++++++++++++++
 
 '''
-# gradient-based registration
+# estimating warping fields based on feature transforms
 '''
 
 
