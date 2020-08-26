@@ -153,6 +153,8 @@ def run_config(config: RunConfiguration, pbar):
         centroids, intervals = get_n_equidistant_angles_and_intervals(config.num_centroids)
     elif config.centroid_method == conf.CentroidMethod.HISTOGRAM_CLUSTERING:
         centroids, intervals = get_main_gradient_angles_and_intervals(static, config.kde_rho)
+    else:
+        raise ValueError(f"Invalid value '{config.centroid_method}' centroid_method.")
 
     assignment_fn = None
 
