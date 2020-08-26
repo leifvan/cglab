@@ -118,7 +118,9 @@ def get_main_gradient_angles_and_intervals(feature_map, rho=0.8):
 
 
 def get_n_equidistant_angles_and_intervals(n_angles):
-    # FIXME does not work for n_angles = 1
+    if n_angles == 1:
+        return np.array([np.pi]), np.array([[np.pi, np.pi]])
+
     centroids = np.linspace(0, 2 * np.pi, endpoint=False, num=n_angles)
     bounds_left = (centroids - centroids[1] / 2) % (2 * np.pi)
     bounds_right = centroids + centroids[1] / 2
