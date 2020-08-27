@@ -10,6 +10,10 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import CSS4_COLORS, to_rgb
 
+CSS_INDIANRED_RGB = to_rgb(CSS4_COLORS['indianred'])
+CSS_STEELBLUE_RGB = to_rgb(CSS4_COLORS['steelblue'])
+CSS_GOLD_RGB = to_rgb(CSS4_COLORS['gold'])
+
 
 def pad_slices(slices, padding, assert_shape=None):
     """
@@ -149,9 +153,9 @@ def get_colored_difference_image(moving=None, static=None):
     image[:] = to_rgb(CSS4_COLORS['white'])
     moving_mask = np.isclose(moving, 1)
     static_mask = np.isclose(static, 1)
-    image[moving_mask & ~static_mask] = to_rgb(CSS4_COLORS['indianred'])
-    image[~moving_mask & static_mask] = to_rgb(CSS4_COLORS['steelblue'])
-    image[moving_mask & static_mask] = to_rgb(CSS4_COLORS['gold'])
+    image[moving_mask & ~static_mask] = CSS_INDIANRED_RGB
+    image[~moving_mask & static_mask] = CSS_STEELBLUE_RGB
+    image[moving_mask & static_mask] = CSS_GOLD_RGB
     return image
 
 

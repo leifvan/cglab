@@ -170,14 +170,15 @@ def plot_polar_gradients(angles, magnitudes, ax=None):
     ax.imshow(vis)
 
 
-def plot_gradients_as_arrows(dy, dx, subsample=1, ax=None):
+def plot_gradients_as_arrows(dy, dx, subsample=1, scale=1, ax=None):
     original_shape = dy.shape
     dy, dx = dy[::subsample, ::subsample], dx[::subsample, ::subsample]
     ax = ax or plt.gca()
     angles = np.arctan2(dy, dx)
     yy, xx = np.mgrid[:dy.shape[1], :dy.shape[0]]
+    colors = angle_to_rgb(angles).reshape(-1, 3)
 
-    ax.quiver(xx * subsample, yy * subsample, -dx, dy, angles, cmap='hsv', scale=1, scale_units='xy')
+    ax.quiver(xx * subsample, yy * subsample, -dx, dy, color=colors, scale=scale, scale_units='xy')
     ax.set_aspect(dy.shape[1] / dy.shape[0])
     ax.set_xlim([0, original_shape[1]-1])
     ax.set_ylim([0, original_shape[0]-1])

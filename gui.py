@@ -465,9 +465,8 @@ elif params.transform_type == conf.TransformType.DENSE:
     the offsets. Then the RBF interpolation for a RBF $\varphi(r)$ is given as
     $$
     \Delta(i,j) = \sum_{k=1}^n w_k\cdot\varphi\left(\left\lVert \begin{pmatrix}i\\j\end{pmatrix} - 
-        \begin{pmatrix} i_k \\ j_k \end{pmatrix} \right\rVert\right)
-    $$ 
-    where 
+        \begin{pmatrix} i_k \\ j_k \end{pmatrix} \right\rVert\right).
+    $$
     '''
 
 transform_dof = None
@@ -517,7 +516,7 @@ def load_config_and_show():
             elif params.transform_type == conf.TransformType.DENSE:
                 local_transform = run_result.results[i - 1].stacked_transform - np.mgrid[:moving.shape[0],
                                                                                 :moving.shape[1]]
-                plot_gradients_as_arrows(*local_transform, subsample=4, ax=axs[0, 1])
+                plot_gradients_as_arrows(*local_transform, subsample=4, scale=None, ax=axs[0, 1])
         axs[0, 1].set_title("estimated transform")
 
         axs[0, 2].imshow(get_colored_difference_image(warped_moving, static))
